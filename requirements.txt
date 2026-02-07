@@ -7,7 +7,6 @@ langchain==0.2.16
 langchain-community==0.2.16
 langchain-core==0.2.40
 langchain-openai==0.1.7
-langchain-huggingface==0.0.3
 
 # ----------------------
 # Vector DB (safe)
@@ -29,10 +28,3 @@ tiktoken
 # PDF
 # ----------------------
 pypdf
-
-# ----------------------
-# Intent model (LET PIP DECIDE TORCH)
-# ----------------------
-transformers==4.39.3
-sentencepiece
-accelerate
