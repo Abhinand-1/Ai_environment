@@ -9,6 +9,13 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_openai import ChatOpenAI
 
+
+import os
+os.environ["LANGCHAIN_TRACING_V2"] = "false"
+os.environ["LANGCHAIN_ENDPOINT"] = ""
+os.environ["LANGCHAIN_API_KEY"] = ""
+os.environ["CHROMA_TELEMETRY"] = "false"
+
 # ------------------------------
 # OpenAI API Key
 # ------------------------------
