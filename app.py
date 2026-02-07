@@ -4,7 +4,7 @@ import json
 
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_community.chat_models import ChatOpenAI
@@ -32,11 +32,11 @@ st.markdown(
     This assistant answers **environmental condition queries** by:
     - Identifying the environmental theme  
     - Selecting the most suitable satellite index  
-    - Providing the equation  
-    - Recommending the best satellite  
+    - Providing the mathematical equation  
+    - Recommending the best satellite sensor  
     - Returning a computation template  
 
-    The system uses a **Retrieval-Augmented Generation (RAG)** pipeline
+    The system is based on a **Retrieval-Augmented Generation (RAG)** framework
     grounded in **fixed scientific reference documents**.
     """
 )
@@ -97,7 +97,7 @@ def build_vectorstore():
     return vectorstore
 
 # ------------------------------
-# ✅ FIX 1: RAG PROMPT (ASSIGNED PROPERLY)
+# RAG Prompt
 # ------------------------------
 RAG_PROMPT = """
 You are a remote sensing and environmental analysis expert.
@@ -114,7 +114,7 @@ STRICT SCIENTIFIC RULES:
 - Do NOT invent indices, equations, or satellites
 - Do NOT mix multiple indices
 - Flood, inundation, surface water, or waterlogging problems MUST use water-related indices
-- Built-up or urban indices (e.g., NDBI, UI) are NOT valid for flood or water assessment
+- Built-up or urban indices are NOT valid for flood or water assessment
 - Vegetation indices are NOT valid for flood assessment
 - Output MUST be valid JSON only
 - Be scientifically correct and conservative
@@ -175,21 +175,14 @@ query = st.text_input(
 if query:
     with st.spinner("🧠 Running RAG pipeline..."):
 
-        # ------------------------------
-        # ✅ FIX 2: SOFT DOMAIN HINT (NOT RULE-BASED)
-        # ------------------------------
-        domain_query = query + " water flood surface water index"
+        # Soft domain hint to guide retrieval (NOT rule-based)
+        domain_query = query + " water flood drought vegetation index"
 
         domain_docs = domain_retriever.invoke(domain_query)
         execution_docs = execution_retriever.invoke(query)
 
-        domain_context = "\n\n".join(
-            doc.page_content for doc in domain_docs
-        )
-
-        execution_context = "\n\n".join(
-            doc.page_content for doc in execution_docs
-        )
+        domain_context = "\n\n".join(doc.page_content for doc in domain_docs)
+        execution_context = "\n\n".join(doc.page_content for doc in execution_docs)
 
         prompt = RAG_PROMPT.format(
             domain_context=domain_context,
