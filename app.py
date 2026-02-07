@@ -2,6 +2,9 @@ import streamlit as st
 import os
 import json
 
+# ==============================
+# LangChain Imports (STABLE)
+# ==============================
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -9,22 +12,24 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_openai import ChatOpenAI
 
-# 🔹 NEW: BERT intent classifier
+# ==============================
+# Intent Model (LIGHTWEIGHT)
+# ==============================
 from transformers import pipeline
 
-# ------------------------------
+# ==============================
 # OpenAI API Key
-# ------------------------------
+# ==============================
 OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
     st.error("❌ OpenAI API key not found in Streamlit Secrets.")
     st.stop()
 
-# ------------------------------
+# ==============================
 # Page Config
-# ------------------------------
+# ==============================
 st.set_page_config(
-    page_title="Environmental RAG Assistant",
+    page_title="Environmental Remote Sensing RAG Assistant",
     layout="wide"
 )
 
@@ -33,30 +38,32 @@ st.title("🌍 Environmental Remote Sensing RAG Assistant")
 st.markdown(
     """
     This assistant answers **environmental condition queries** by:
-    - Identifying the environmental theme  
+
+    - Identifying the environmental condition  
     - Selecting the most suitable satellite index  
     - Providing the equation  
     - Recommending the best satellite  
     - Returning a computation template  
 
-    The system uses a **BERT + Retrieval-Augmented Generation (RAG)** pipeline
-    grounded in **fixed scientific reference documents**.
+    **Architecture:**  
+    BERT-based intent detection + Retrieval-Augmented Generation (RAG)  
+    grounded in fixed scientific PDF references.
     """
 )
 
-# ------------------------------
-# Fixed PDF paths
-# ------------------------------
+# ==============================
+# Fixed PDF Paths (MUST be in repo root)
+# ==============================
 DOMAIN_PDF = "Satellite Spectral Indices Reference For Rag Models.pdf"
 EXECUTION_PDF = "code_for traing.pdf"
 
 if not os.path.exists(DOMAIN_PDF) or not os.path.exists(EXECUTION_PDF):
-    st.error("❌ Reference PDFs not found.")
+    st.error("❌ Reference PDFs not found in repository root.")
     st.stop()
 
-# ------------------------------
-# Helper: Load PDF with metadata
-# ------------------------------
+# ==============================
+# Load PDFs with Metadata
+# ==============================
 def load_pdf(path, doc_type):
     loader = PyPDFLoader(path)
     pages = loader.load()
@@ -71,9 +78,9 @@ def load_pdf(path, doc_type):
         )
     return docs
 
-# ------------------------------
-# Build Vector Store (cached)
-# ------------------------------
+# ==============================
+# Build Vector Store (CACHED)
+# ==============================
 @st.cache_resource(show_spinner=False)
 def build_vectorstore():
     domain_docs = load_pdf(DOMAIN_PDF, "domain_knowledge")
@@ -85,6 +92,7 @@ def build_vectorstore():
         chunk_size=250,
         chunk_overlap=30
     )
+
     chunked_docs = splitter.split_documents(documents)
 
     embeddings = HuggingFaceEmbeddings(
@@ -99,9 +107,9 @@ def build_vectorstore():
 
     return vectorstore
 
-# ------------------------------
-# RAG PROMPT
-# ------------------------------
+# ==============================
+# RAG Prompt (STRICT SCIENTIFIC)
+# ==============================
 RAG_PROMPT = """
 You are a remote sensing and environmental analysis expert.
 
@@ -112,14 +120,13 @@ Your task:
 4. Recommend the most appropriate satellite sensor
 5. Provide a computation template
 
-STRICT SCIENTIFIC RULES:
+STRICT RULES:
 - Use ONLY the provided context
-- Do NOT invent indices, equations, or satellites
+- Do NOT invent indices, formulas, or satellites
 - Do NOT mix multiple indices
-- Flood, inundation, surface water, or waterlogging problems MUST use water-related indices
-- Built-up or urban indices are NOT valid for flood assessment
+- Flood-related problems MUST use water-related indices
 - Vegetation indices are NOT valid for flood assessment
-- Output MUST be valid JSON only
+- Output MUST be valid JSON ONLY
 
 ====================
 DOMAIN KNOWLEDGE
@@ -137,17 +144,17 @@ Question:
 Return JSON only.
 """
 
-# ------------------------------
+# ==============================
 # Initialize Vector Store
-# ------------------------------
+# ==============================
 with st.spinner("🔄 Loading environmental knowledge base..."):
     vectorstore = build_vectorstore()
 
 st.success("✅ Knowledge base loaded")
 
-# ------------------------------
-# Metadata-filtered retrievers
-# ------------------------------
+# ==============================
+# Metadata-Filtered Retrievers
+# ==============================
 domain_retriever = vectorstore.as_retriever(
     search_kwargs={"k": 4, "filter": {"doc_type": "domain_knowledge"}}
 )
@@ -156,59 +163,71 @@ execution_retriever = vectorstore.as_retriever(
     search_kwargs={"k": 4, "filter": {"doc_type": "execution_reference"}}
 )
 
-# ------------------------------
+# ==============================
 # LLM
-# ------------------------------
+# ==============================
 llm = ChatOpenAI(
     model="gpt-3.5-turbo",
     temperature=0,
     api_key=OPENAI_API_KEY
 )
 
-# ------------------------------
-# 🔹 BERT INTENT CLASSIFIER
-# ------------------------------
+# ==============================
+# Intent Classifier (SAFE MODEL)
+# ==============================
 @st.cache_resource(show_spinner=False)
 def load_intent_classifier():
     return pipeline(
         "zero-shot-classification",
-        model="facebook/bart-large-mnli"
+        model="valhalla/distilbart-mnli-12-1"
     )
 
 intent_classifier = load_intent_classifier()
 
 INTENT_LABELS = ["flood", "drought", "vegetation", "urban", "water"]
+INTENT_CONFIDENCE_THRESHOLD = 0.55
+
+INTENT_HINTS = {
+    "flood": "flood inundation surface water index",
+    "water": "surface water wetland index",
+    "drought": "moisture stress drought index",
+    "vegetation": "vegetation health chlorophyll index",
+    "urban": "built-up impervious surface index"
+}
 
 def detect_intent(query):
     result = intent_classifier(query, INTENT_LABELS)
     return result["labels"][0], result["scores"][0]
 
-INTENT_HINTS = {
-    "flood": "water flood inundation surface water index",
-    "water": "surface water wetland index",
-    "drought": "moisture stress vegetation water deficit",
-    "vegetation": "vegetation health chlorophyll biomass",
-    "urban": "built-up impervious urban index"
-}
-
-# ------------------------------
+# ==============================
 # User Query
-# ------------------------------
+# ==============================
 st.subheader("🔎 Ask an environmental question")
 
 query = st.text_input(
     "Example: How can flood risk be assessed using satellite data?"
 )
 
+# ==============================
+# Run Pipeline
+# ==============================
 if query:
-    with st.spinner("🧠 Running BERT + RAG pipeline..."):
+    with st.spinner("🧠 Running intent-aware RAG pipeline..."):
 
-        # 🔹 BERT intent detection
         intent, confidence = detect_intent(query)
-        st.info(f"🧠 Detected intent: **{intent}** (confidence: {confidence:.2f})")
 
-        # 🔹 Intent-guided retrieval (NOT rule-based)
-        domain_query = query + " " + INTENT_HINTS.get(intent, "")
+        if confidence < INTENT_CONFIDENCE_THRESHOLD:
+            st.warning(
+                f"🧠 Low intent confidence ({confidence:.2f}). "
+                "Using general semantic retrieval."
+            )
+            domain_query = query
+        else:
+            st.info(
+                f"🧠 Detected intent: **{intent}** "
+                f"(confidence: {confidence:.2f})"
+            )
+            domain_query = query + " " + INTENT_HINTS.get(intent, "")
 
         domain_docs = domain_retriever.invoke(domain_query)
         execution_docs = execution_retriever.invoke(query)
@@ -224,10 +243,26 @@ if query:
 
         response = llm.invoke(prompt)
 
-        try:
-            output = json.loads(response.content)
+        # ==============================
+        # Robust JSON Parsing
+        # ==============================
+        def safe_json_parse(text):
+            try:
+                return json.loads(text)
+            except json.JSONDecodeError:
+                text = text.strip()
+                if text.startswith("```"):
+                    text = text.split("```")[1]
+                try:
+                    return json.loads(text)
+                except Exception:
+                    return None
+
+        parsed = safe_json_parse(response.content)
+
+        if parsed:
             st.success("✅ Structured Scientific Answer")
-            st.json(output)
-        except json.JSONDecodeError:
+            st.json(parsed)
+        else:
             st.error("⚠️ Model returned invalid JSON")
             st.text(response.content)
