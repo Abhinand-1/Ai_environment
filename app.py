@@ -91,15 +91,16 @@ def build_vectorstore():
     )
     chunked_docs = splitter.split_documents(documents)
 
-    embeddings = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2"
-    )
+ embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2"
+)
 
-    vectorstore = Chroma.from_documents(
-        documents=chunked_docs,
-        embedding=embeddings,
-        persist_directory="./rag_db"
-    )
+
+   vectorstore = Chroma.from_documents(
+    documents=chunked_docs,
+    embedding=embeddings
+)
+
 
     return vectorstore
 
