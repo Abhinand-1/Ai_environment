@@ -8,6 +8,8 @@ from langchain.llms import OpenAI
 from langchain.chains import RetrievalQA
 from langchain.document_loaders import TextLoader, PyPDFLoader
 
+#--------------------------
+OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 # ------------------------------
 # Page Config
 # ------------------------------
