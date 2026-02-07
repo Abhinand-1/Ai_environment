@@ -1,8 +1,10 @@
 streamlit==1.54.0
 
-# LangChain core
+# LangChain (stable)
 langchain==0.2.16
 langchain-community==0.2.16
+langchain-openai==0.1.7
+langchain-huggingface==0.0.3
 
 # Vector DB
 chromadb==0.5.5
@@ -10,14 +12,14 @@ chromadb==0.5.5
 # Embeddings
 sentence-transformers==5.2.2
 
-# LLM
+# OpenAI
 openai==2.17.0
 tiktoken
 
-# PDF loader
+# PDF
 pypdf
 
-# 🔹 BERT / BART intent classifier
+# 🔹 Intent model (SAFE versions)
 transformers==4.39.3
 torch==2.2.2
 sentencepiece
