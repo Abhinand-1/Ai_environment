@@ -5,9 +5,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import TextLoader, PyPDFLoader
-from langchain_community.llms import OpenAI
+from langchain_community.chat_models import ChatOpenAI
 from langchain.chains import RetrievalQA
-
 
 # ------------------------------
 # Load OpenAI API Key from Streamlit Secrets
@@ -49,7 +48,7 @@ uploaded_file = st.sidebar.file_uploader(
 # ------------------------------
 # Load & Process Document
 # ------------------------------
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def load_vectorstore(file_path, file_type):
     if file_type == "Text (.txt)":
         loader = TextLoader(file_path)
@@ -88,16 +87,17 @@ if uploaded_file:
     st.success("✅ Document indexed successfully!")
 
     # ------------------------------
-    # LLM
+    # LLM (ChatOpenAI – REQUIRED)
     # ------------------------------
-    llm = OpenAI(
+    llm = ChatOpenAI(
+        model="gpt-3.5-turbo",
         temperature=0,
-        openai_api_key=OPENAI_API_KEY
+        api_key=OPENAI_API_KEY
     )
 
     qa_chain = RetrievalQA.from_chain_type(
         llm=llm,
-        retriever=vectorstore.as_retriever(),
+        retriever=vectorstore.as_retriever(search_kwargs={"k": 4}),
         return_source_documents=True
     )
 
@@ -106,14 +106,14 @@ if uploaded_file:
 
     if query:
         with st.spinner("Generating answer..."):
-            result = qa_chain(query)
+            result = qa_chain.invoke({"query": query})
 
         st.markdown("### 🧠 Answer")
         st.write(result["result"])
 
         with st.expander("📚 Source Chunks"):
-            for i, doc in enumerate(result["source_documents"]):
-                st.markdown(f"**Chunk {i+1}:**")
+            for i, doc in enumerate(result["source_documents"], start=1):
+                st.markdown(f"**Chunk {i}:**")
                 st.write(doc.page_content)
 
 else:
