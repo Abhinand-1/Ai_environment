@@ -25,6 +25,18 @@ if not OPENAI_API_KEY:
     st.error("❌ OpenAI API key not found in Streamlit Secrets.")
     st.stop()
 
+
+try:
+    test_llm = ChatOpenAI(
+        model="gpt-4o-mini",
+        api_key=OPENAI_API_KEY
+    )
+    test_llm.invoke("ping")
+except Exception as e:
+    st.error("❌ OpenAI connection failed")
+    st.exception(e)
+    st.stop()
+
 # ------------------------------
 # Page Config
 # ------------------------------
