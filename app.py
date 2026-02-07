@@ -3,7 +3,15 @@ import json
 import streamlit as st
 
 # ------------------------------
-# Disable telemetry (important for Streamlit Cloud)
+# Page config MUST be first Streamlit call
+# ------------------------------
+st.set_page_config(
+    page_title="Environmental RAG Assistant",
+    layout="wide"
+)
+
+# ------------------------------
+# Disable telemetry (Streamlit Cloud safe)
 # ------------------------------
 os.environ["LANGCHAIN_TRACING_V2"] = "false"
 os.environ["LANGCHAIN_ENDPOINT"] = ""
@@ -14,7 +22,6 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
-
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 # ------------------------------
@@ -25,26 +32,9 @@ if not OPENAI_API_KEY:
     st.error("❌ OpenAI API key not found in Streamlit Secrets.")
     st.stop()
 
-
-try:
-    test_llm = ChatOpenAI(
-        model="gpt-4o-mini",
-        api_key=OPENAI_API_KEY
-    )
-    test_llm.invoke("ping")
-except Exception as e:
-    st.error("❌ OpenAI connection failed")
-    st.exception(e)
-    st.stop()
-
 # ------------------------------
-# Page Config
+# UI Header
 # ------------------------------
-st.set_page_config(
-    page_title="Environmental RAG Assistant",
-    layout="wide"
-)
-
 st.title("🌍 Environmental Remote Sensing RAG Assistant")
 
 st.markdown(
@@ -77,43 +67,31 @@ if not os.path.exists(DOMAIN_PDF) or not os.path.exists(EXECUTION_PDF):
 def load_pdf(path, doc_type):
     loader = PyPDFLoader(path)
     pages = loader.load()
-
-    docs = []
-    for page in pages:
-        docs.append(
-            Document(
-                page_content=page.page_content,
-                metadata={"doc_type": doc_type}
-            )
-        )
-    return docs
+    return [
+        Document(page_content=p.page_content, metadata={"doc_type": doc_type})
+        for p in pages
+    ]
 
 # ------------------------------
-# Build Vector Store (IN-MEMORY, CLOUD SAFE)
+# Build Vector Store (IN-MEMORY)
 # ------------------------------
 @st.cache_resource(show_spinner=False)
 def build_vectorstore():
     domain_docs = load_pdf(DOMAIN_PDF, "domain_knowledge")
     execution_docs = load_pdf(EXECUTION_PDF, "execution_reference")
 
-    documents = domain_docs + execution_docs
-
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=250,
         chunk_overlap=30
     )
-    chunked_docs = splitter.split_documents(documents)
+    docs = splitter.split_documents(domain_docs + execution_docs)
 
-    embeddings = OpenAIEmbeddings(
-        api_key=OPENAI_API_KEY
-    )
+    embeddings = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
 
-    vectorstore = Chroma.from_documents(
-        documents=chunked_docs,
+    return Chroma.from_documents(
+        documents=docs,
         embedding=embeddings
     )
-
-    return vectorstore
 
 # ------------------------------
 # RAG Prompt
@@ -128,23 +106,17 @@ Your task:
 4. Recommend the most appropriate satellite sensor
 5. Provide a computation template
 
-STRICT SCIENTIFIC RULES:
+Rules:
 - Use ONLY the provided context
-- Do NOT invent indices, equations, or satellites
+- Do NOT invent indices or equations
 - Do NOT mix multiple indices
-- Flood or surface water problems MUST use water-related indices
-- Built-up indices are NOT valid for flood or water assessment
+- Flood or surface water problems MUST use water indices
 - Output MUST be valid JSON only
-- Be scientifically conservative and precise
 
-====================
-DOMAIN KNOWLEDGE
-====================
+DOMAIN KNOWLEDGE:
 {domain_context}
 
-====================
-EXECUTION REFERENCE
-====================
+EXECUTION REFERENCE:
 {execution_context}
 
 Question:
@@ -167,7 +139,6 @@ st.success("✅ Knowledge base loaded")
 domain_retriever = vectorstore.as_retriever(
     search_kwargs={"k": 4, "filter": {"doc_type": "domain_knowledge"}}
 )
-
 execution_retriever = vectorstore.as_retriever(
     search_kwargs={"k": 4, "filter": {"doc_type": "execution_reference"}}
 )
@@ -181,7 +152,6 @@ llm = ChatOpenAI(
     api_key=OPENAI_API_KEY
 )
 
-
 # ------------------------------
 # User Query
 # ------------------------------
@@ -194,27 +164,22 @@ query = st.text_input(
 if query:
     with st.spinner("🧠 Running RAG pipeline..."):
 
-        # Soft retrieval hint (NOT rule-based)
         domain_query = query + " water flood drought vegetation index"
 
         domain_docs = domain_retriever.invoke(domain_query)
         execution_docs = execution_retriever.invoke(query)
 
-        domain_context = "\n\n".join(doc.page_content for doc in domain_docs)
-        execution_context = "\n\n".join(doc.page_content for doc in execution_docs)
-
         prompt = RAG_PROMPT.format(
-            domain_context=domain_context,
-            execution_context=execution_context,
+            domain_context="\n\n".join(d.page_content for d in domain_docs),
+            execution_context="\n\n".join(d.page_content for d in execution_docs),
             question=query
         )
 
         response = llm.invoke(prompt)
 
         try:
-            output = json.loads(response.content)
             st.success("✅ Structured Scientific Answer")
-            st.json(output)
-        except json.JSONDecodeError:
+            st.json(json.loads(response.content))
+        except Exception:
             st.error("⚠️ Model returned invalid JSON")
             st.text(response.content)
