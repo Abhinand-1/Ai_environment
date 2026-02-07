@@ -1,120 +1,180 @@
 import streamlit as st
 import os
+import json
 
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_core.documents import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import FAISS
-from langchain_community.document_loaders import TextLoader, PyPDFLoader
+from langchain_community.vectorstores import Chroma
 from langchain_community.chat_models import ChatOpenAI
-from langchain.chains import RetrievalQA
 
 # ------------------------------
-# Load OpenAI API Key from Streamlit Secrets
+# OpenAI API Key
 # ------------------------------
 OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY")
-
 if not OPENAI_API_KEY:
-    st.error("❌ OpenAI API key not found. Please add it in Streamlit Secrets.")
+    st.error("❌ OpenAI API key not found in Streamlit Secrets.")
     st.stop()
 
 # ------------------------------
 # Page Config
 # ------------------------------
-st.set_page_config(page_title="RAG Demo App", layout="wide")
-st.title("📄 Retrieval Augmented Generation (RAG) App")
+st.set_page_config(
+    page_title="Environmental RAG Assistant",
+    layout="wide"
+)
+
+st.title("🌍 Environmental Remote Sensing RAG Assistant")
 
 st.markdown(
     """
-    This app demonstrates **RAG (Retrieval Augmented Generation)** using  
-    document embeddings + vector search + LLM.
+    This assistant answers **environmental condition queries** by:
+    - Selecting the most suitable satellite index  
+    - Providing the equation  
+    - Recommending the best satellite  
+    - Returning a computation template  
+
+    The knowledge base is built from **fixed reference PDFs**.
     """
 )
 
 # ------------------------------
-# Sidebar
+# Fixed PDF paths (from GitHub)
 # ------------------------------
-st.sidebar.header("⚙️ Configuration")
+DECISION_PDF = "data/Satellite Spectral Indices Reference For Rag Models.pdf"
+IMPLEMENTATION_PDF = "data/code_for traing.pdf"
 
-doc_type = st.sidebar.selectbox(
-    "Select Document Type",
-    ["Text (.txt)", "PDF (.pdf)"]
-)
-
-uploaded_file = st.sidebar.file_uploader(
-    "Upload a document",
-    type=["txt", "pdf"]
-)
+if not os.path.exists(DECISION_PDF) or not os.path.exists(IMPLEMENTATION_PDF):
+    st.error("❌ Reference PDFs not found in /data folder.")
+    st.stop()
 
 # ------------------------------
-# Load & Process Document
+# Helper: Load PDF with metadata
+# ------------------------------
+def load_pdf(path, doc_type):
+    loader = PyPDFLoader(path)
+    pages = loader.load()
+
+    docs = []
+    for page in pages:
+        docs.append(
+            Document(
+                page_content=page.page_content,
+                metadata={"doc_type": doc_type}
+            )
+        )
+    return docs
+
+# ------------------------------
+# Build Vector Store (cached)
 # ------------------------------
 @st.cache_resource(show_spinner=False)
-def load_vectorstore(file_path, file_type):
-    if file_type == "Text (.txt)":
-        loader = TextLoader(file_path)
-    else:
-        loader = PyPDFLoader(file_path)
+def build_vectorstore():
+    decision_docs = load_pdf(DECISION_PDF, "index_registry")
+    impl_docs = load_pdf(IMPLEMENTATION_PDF, "implementation_reference")
 
-    documents = loader.load()
+    documents = decision_docs + impl_docs
 
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=500,
-        chunk_overlap=50
+        chunk_size=300,
+        chunk_overlap=0
     )
-
-    docs = splitter.split_documents(documents)
+    chunked_docs = splitter.split_documents(documents)
 
     embeddings = HuggingFaceEmbeddings(
         model_name="sentence-transformers/all-MiniLM-L6-v2"
     )
 
-    vectorstore = FAISS.from_documents(docs, embeddings)
+    vectorstore = Chroma.from_documents(
+        documents=chunked_docs,
+        embedding=embeddings,
+        persist_directory="./rag_db"
+    )
+
     return vectorstore
 
 # ------------------------------
-# Main Logic
+# RAG Prompt (from notebook)
 # ------------------------------
-if uploaded_file:
-    with st.spinner("Processing document..."):
-        os.makedirs("temp", exist_ok=True)
-        file_path = f"temp/{uploaded_file.name}"
+RAG_PROMPT = """
+You are a remote sensing expert.
 
-        with open(file_path, "wb") as f:
-            f.write(uploaded_file.read())
+Task:
+- Identify the environmental condition
+- Recommend ONE suitable index
+- Provide its formula
+- Recommend the best satellite
+- Provide a computation template
 
-        vectorstore = load_vectorstore(file_path, doc_type)
+Rules:
+- Use ONLY the given context
+- Do NOT invent indices or formulas
+- Do NOT mix multiple indices
+- Output must be VALID JSON
 
-    st.success("✅ Document indexed successfully!")
+Context:
+{context}
 
-    # ------------------------------
-    # LLM (ChatOpenAI – REQUIRED)
-    # ------------------------------
-    llm = ChatOpenAI(
-        model="gpt-3.5-turbo",
-        temperature=0,
-        api_key=OPENAI_API_KEY
-    )
+Question:
+{question}
 
-    qa_chain = RetrievalQA.from_chain_type(
-        llm=llm,
-        retriever=vectorstore.as_retriever(search_kwargs={"k": 4}),
-        return_source_documents=True
-    )
+Return JSON only.
+"""
 
-    st.subheader("🔎 Ask a question")
-    query = st.text_input("Enter your query")
+# ------------------------------
+# Initialize Vector Store
+# ------------------------------
+with st.spinner("🔄 Loading environmental knowledge base..."):
+    vectorstore = build_vectorstore()
 
-    if query:
-        with st.spinner("Generating answer..."):
-            result = qa_chain.invoke({"query": query})
+st.success("✅ Knowledge base loaded")
 
-        st.markdown("### 🧠 Answer")
-        st.write(result["result"])
+# Metadata-filtered retrievers
+decision_retriever = vectorstore.as_retriever(
+    search_kwargs={"k": 4, "filter": {"doc_type": "index_registry"}}
+)
 
-        with st.expander("📚 Source Chunks"):
-            for i, doc in enumerate(result["source_documents"], start=1):
-                st.markdown(f"**Chunk {i}:**")
-                st.write(doc.page_content)
+impl_retriever = vectorstore.as_retriever(
+    search_kwargs={"k": 4, "filter": {"doc_type": "implementation_reference"}}
+)
 
-else:
-    st.info("⬅️ Upload a document to begin")
+# LLM
+llm = ChatOpenAI(
+    model="gpt-3.5-turbo",
+    temperature=0,
+    api_key=OPENAI_API_KEY
+)
+
+# ------------------------------
+# User Query
+# ------------------------------
+st.subheader("🔎 Ask an environmental question")
+
+query = st.text_input(
+    "Example: How to assess vegetation stress using satellite data?"
+)
+
+if query:
+    with st.spinner("🧠 Running RAG pipeline..."):
+        decision_docs = decision_retriever.invoke(query)
+        impl_docs = impl_retriever.invoke(query)
+
+        context = "\n\n".join(
+            [doc.page_content for doc in decision_docs + impl_docs]
+        )
+
+        prompt = RAG_PROMPT.format(
+            context=context,
+            question=query
+        )
+
+        response = llm.invoke(prompt)
+
+        try:
+            output = json.loads(response.content)
+            st.success("✅ Structured Answer")
+            st.json(output)
+        except json.JSONDecodeError:
+            st.error("⚠️ Model returned invalid JSON")
+            st.text(response.content)
