@@ -4,6 +4,7 @@ langchain==0.2.16
 langchain-community==0.2.16
 
 faiss-cpu==1.13.2
+chromadb==0.5.5
 sentence-transformers==5.2.2
 
 openai==2.17.0
