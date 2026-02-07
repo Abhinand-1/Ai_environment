@@ -9,6 +9,9 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_community.chat_models import ChatOpenAI
 
+# 🔹 NEW: BERT intent classifier
+from transformers import pipeline
+
 # ------------------------------
 # OpenAI API Key
 # ------------------------------
@@ -36,7 +39,7 @@ st.markdown(
     - Recommending the best satellite  
     - Returning a computation template  
 
-    The system uses a **Retrieval-Augmented Generation (RAG)** pipeline
+    The system uses a **BERT + Retrieval-Augmented Generation (RAG)** pipeline
     grounded in **fixed scientific reference documents**.
     """
 )
@@ -97,7 +100,7 @@ def build_vectorstore():
     return vectorstore
 
 # ------------------------------
-# ✅ FIX 1: RAG PROMPT (ASSIGNED PROPERLY)
+# RAG PROMPT
 # ------------------------------
 RAG_PROMPT = """
 You are a remote sensing and environmental analysis expert.
@@ -114,10 +117,9 @@ STRICT SCIENTIFIC RULES:
 - Do NOT invent indices, equations, or satellites
 - Do NOT mix multiple indices
 - Flood, inundation, surface water, or waterlogging problems MUST use water-related indices
-- Built-up or urban indices (e.g., NDBI, UI) are NOT valid for flood or water assessment
+- Built-up or urban indices are NOT valid for flood assessment
 - Vegetation indices are NOT valid for flood assessment
 - Output MUST be valid JSON only
-- Be scientifically correct and conservative
 
 ====================
 DOMAIN KNOWLEDGE
@@ -164,6 +166,32 @@ llm = ChatOpenAI(
 )
 
 # ------------------------------
+# 🔹 BERT INTENT CLASSIFIER
+# ------------------------------
+@st.cache_resource(show_spinner=False)
+def load_intent_classifier():
+    return pipeline(
+        "zero-shot-classification",
+        model="facebook/bart-large-mnli"
+    )
+
+intent_classifier = load_intent_classifier()
+
+INTENT_LABELS = ["flood", "drought", "vegetation", "urban", "water"]
+
+def detect_intent(query):
+    result = intent_classifier(query, INTENT_LABELS)
+    return result["labels"][0], result["scores"][0]
+
+INTENT_HINTS = {
+    "flood": "water flood inundation surface water index",
+    "water": "surface water wetland index",
+    "drought": "moisture stress vegetation water deficit",
+    "vegetation": "vegetation health chlorophyll biomass",
+    "urban": "built-up impervious urban index"
+}
+
+# ------------------------------
 # User Query
 # ------------------------------
 st.subheader("🔎 Ask an environmental question")
@@ -173,23 +201,20 @@ query = st.text_input(
 )
 
 if query:
-    with st.spinner("🧠 Running RAG pipeline..."):
+    with st.spinner("🧠 Running BERT + RAG pipeline..."):
 
-        # ------------------------------
-        # ✅ FIX 2: SOFT DOMAIN HINT (NOT RULE-BASED)
-        # ------------------------------
-        domain_query = query + " water flood surface water index"
+        # 🔹 BERT intent detection
+        intent, confidence = detect_intent(query)
+        st.info(f"🧠 Detected intent: **{intent}** (confidence: {confidence:.2f})")
+
+        # 🔹 Intent-guided retrieval (NOT rule-based)
+        domain_query = query + " " + INTENT_HINTS.get(intent, "")
 
         domain_docs = domain_retriever.invoke(domain_query)
         execution_docs = execution_retriever.invoke(query)
 
-        domain_context = "\n\n".join(
-            doc.page_content for doc in domain_docs
-        )
-
-        execution_context = "\n\n".join(
-            doc.page_content for doc in execution_docs
-        )
+        domain_context = "\n\n".join(doc.page_content for doc in domain_docs)
+        execution_context = "\n\n".join(doc.page_content for doc in execution_docs)
 
         prompt = RAG_PROMPT.format(
             domain_context=domain_context,
