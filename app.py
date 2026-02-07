@@ -21,7 +21,7 @@ os.environ["CHROMA_TELEMETRY"] = "false"
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import Chroma
+from langchain_community.vectorstores import FAISS
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 # ------------------------------
@@ -88,10 +88,11 @@ def build_vectorstore():
 
     embeddings = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
 
-    return Chroma.from_documents(
-        documents=docs,
-        embedding=embeddings
-    )
+return FAISS.from_documents(
+    documents=docs,
+    embedding=embeddings
+)
+
 
 # ------------------------------
 # RAG Prompt
