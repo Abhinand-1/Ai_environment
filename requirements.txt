@@ -1,16 +1,19 @@
-streamlit==1.54.0
+streamlit>=1.30.0
 
-langchain==0.2.16
-langchain-community==0.2.16
-langchain-core==0.2.40
-langchain-openai==0.1.7
+langchain>=0.1.16
+langchain-community>=0.0.34
+langchain-core>=0.1.43
 
-chromadb==0.4.24
+openai>=1.10.0
 
-sentence-transformers==5.2.2
+chromadb>=0.4.24
 
-openai==2.17.0
-tiktoken
+sentence-transformers>=2.2.2
+huggingface-hub>=0.20.3
 
-pypdf
+pypdf>=4.0.1
+
+tiktoken>=0.5.2
+
+numpy>=1.24.0
 
