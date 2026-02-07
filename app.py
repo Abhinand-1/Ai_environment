@@ -42,8 +42,9 @@ st.markdown(
 # ------------------------------
 # Fixed PDF paths (from GitHub)
 # ------------------------------
-DECISION_PDF = "data/Satellite Spectral Indices Reference For Rag Models.pdf"
-IMPLEMENTATION_PDF = "data/code_for traing.pdf"
+DECISION_PDF = "Satellite Spectral Indices Reference For Rag Models.pdf"
+IMPLEMENTATION_PDF = "code_for traing.pdf"
+
 
 if not os.path.exists(DECISION_PDF) or not os.path.exists(IMPLEMENTATION_PDF):
     st.error("❌ Reference PDFs not found in /data folder.")
