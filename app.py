@@ -1,12 +1,22 @@
-from langchain_core.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import FAISS
-from langchain_community.llms import OpenAI
-from langchain.chains import RetrievalQA
-from langchain_community.document_loaders import TextLoader, PyPDFLoader
+import streamlit as st
+import os
 
-#--------------------------
-OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.embeddings import HuggingFaceEmbeddings
+from langchain.vectorstores import FAISS
+from langchain.llms import OpenAI
+from langchain.chains import RetrievalQA
+from langchain.document_loaders import TextLoader, PyPDFLoader
+
+# ------------------------------
+# Load OpenAI API Key from Streamlit Secrets
+# ------------------------------
+OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY")
+
+if not OPENAI_API_KEY:
+    st.error("❌ OpenAI API key not found. Please add it in Streamlit Secrets.")
+    st.stop()
+
 # ------------------------------
 # Page Config
 # ------------------------------
@@ -24,11 +34,6 @@ st.markdown(
 # Sidebar
 # ------------------------------
 st.sidebar.header("⚙️ Configuration")
-
-OPENAI_API_KEY = st.sidebar.text_input(
-    "OpenAI API Key",
-    type="password"
-)
 
 doc_type = st.sidebar.selectbox(
     "Select Document Type",
@@ -69,7 +74,7 @@ def load_vectorstore(file_path, file_type):
 # ------------------------------
 # Main Logic
 # ------------------------------
-if uploaded_file and OPENAI_API_KEY:
+if uploaded_file:
     with st.spinner("Processing document..."):
         os.makedirs("temp", exist_ok=True)
         file_path = f"temp/{uploaded_file.name}"
@@ -81,7 +86,9 @@ if uploaded_file and OPENAI_API_KEY:
 
     st.success("✅ Document indexed successfully!")
 
+    # ------------------------------
     # LLM
+    # ------------------------------
     llm = OpenAI(
         temperature=0,
         openai_api_key=OPENAI_API_KEY
@@ -109,4 +116,4 @@ if uploaded_file and OPENAI_API_KEY:
                 st.write(doc.page_content)
 
 else:
-    st.info("⬅️ Upload a document and enter API key to begin")
+    st.info("⬅️ Upload a document to begin")
