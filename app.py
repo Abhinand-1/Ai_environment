@@ -1,20 +1,21 @@
-import streamlit as st
 import os
 import json
+import streamlit as st
 
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_core.documents import Document
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
-from langchain_openai import ChatOpenAI
-
-
-import os
+# ------------------------------
+# Disable telemetry (important for Streamlit Cloud)
+# ------------------------------
 os.environ["LANGCHAIN_TRACING_V2"] = "false"
 os.environ["LANGCHAIN_ENDPOINT"] = ""
 os.environ["LANGCHAIN_API_KEY"] = ""
 os.environ["CHROMA_TELEMETRY"] = "false"
+
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_core.documents import Document
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import Chroma
+
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 # ------------------------------
 # OpenAI API Key
@@ -37,10 +38,10 @@ st.title("🌍 Environmental Remote Sensing RAG Assistant")
 st.markdown(
     """
     This assistant answers **environmental condition queries** by:
-    - Identifying the environmental theme  
+    - Identifying the environmental condition  
     - Selecting the most suitable satellite index  
     - Providing the mathematical equation  
-    - Recommending the best satellite sensor  
+    - Recommending the appropriate satellite sensor  
     - Returning a computation template  
 
     The system is based on a **Retrieval-Augmented Generation (RAG)** framework
@@ -49,17 +50,17 @@ st.markdown(
 )
 
 # ------------------------------
-# Fixed PDF paths
+# PDF paths
 # ------------------------------
 DOMAIN_PDF = "Satellite Spectral Indices Reference For Rag Models.pdf"
 EXECUTION_PDF = "code_for traing.pdf"
 
 if not os.path.exists(DOMAIN_PDF) or not os.path.exists(EXECUTION_PDF):
-    st.error("❌ Reference PDFs not found.")
+    st.error("❌ Reference PDFs not found in the repository.")
     st.stop()
 
 # ------------------------------
-# Helper: Load PDF with metadata
+# Load PDF with metadata
 # ------------------------------
 def load_pdf(path, doc_type):
     loader = PyPDFLoader(path)
@@ -76,7 +77,7 @@ def load_pdf(path, doc_type):
     return docs
 
 # ------------------------------
-# Build Vector Store (cached)
+# Build Vector Store (IN-MEMORY, CLOUD SAFE)
 # ------------------------------
 @st.cache_resource(show_spinner=False)
 def build_vectorstore():
@@ -91,16 +92,14 @@ def build_vectorstore():
     )
     chunked_docs = splitter.split_documents(documents)
 
- embeddings = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
-)
+    embeddings = OpenAIEmbeddings(
+        api_key=OPENAI_API_KEY
+    )
 
-
-   vectorstore = Chroma.from_documents(
-    documents=chunked_docs,
-    embedding=embeddings
-)
-
+    vectorstore = Chroma.from_documents(
+        documents=chunked_docs,
+        embedding=embeddings
+    )
 
     return vectorstore
 
@@ -121,11 +120,10 @@ STRICT SCIENTIFIC RULES:
 - Use ONLY the provided context
 - Do NOT invent indices, equations, or satellites
 - Do NOT mix multiple indices
-- Flood, inundation, surface water, or waterlogging problems MUST use water-related indices
-- Built-up or urban indices are NOT valid for flood or water assessment
-- Vegetation indices are NOT valid for flood assessment
+- Flood or surface water problems MUST use water-related indices
+- Built-up indices are NOT valid for flood or water assessment
 - Output MUST be valid JSON only
-- Be scientifically correct and conservative
+- Be scientifically conservative and precise
 
 ====================
 DOMAIN KNOWLEDGE
@@ -152,7 +150,7 @@ with st.spinner("🔄 Loading environmental knowledge base..."):
 st.success("✅ Knowledge base loaded")
 
 # ------------------------------
-# Metadata-filtered retrievers
+# Retrievers
 # ------------------------------
 domain_retriever = vectorstore.as_retriever(
     search_kwargs={"k": 4, "filter": {"doc_type": "domain_knowledge"}}
@@ -183,7 +181,7 @@ query = st.text_input(
 if query:
     with st.spinner("🧠 Running RAG pipeline..."):
 
-        # Soft domain hint to guide retrieval (NOT rule-based)
+        # Soft retrieval hint (NOT rule-based)
         domain_query = query + " water flood drought vegetation index"
 
         domain_docs = domain_retriever.invoke(domain_query)
