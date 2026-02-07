@@ -30,24 +30,25 @@ st.title("🌍 Environmental Remote Sensing RAG Assistant")
 st.markdown(
     """
     This assistant answers **environmental condition queries** by:
+    - Identifying the environmental theme  
     - Selecting the most suitable satellite index  
     - Providing the equation  
     - Recommending the best satellite  
     - Returning a computation template  
 
-    The knowledge base is built from **fixed reference PDFs**.
+    The system uses a **Retrieval-Augmented Generation (RAG)** pipeline
+    grounded in **fixed scientific reference documents**.
     """
 )
 
 # ------------------------------
-# Fixed PDF paths (from GitHub)
+# Fixed PDF paths
 # ------------------------------
-DECISION_PDF = "Satellite Spectral Indices Reference For Rag Models.pdf"
-IMPLEMENTATION_PDF = "code_for traing.pdf"
+DOMAIN_PDF = "Satellite Spectral Indices Reference For Rag Models.pdf"
+EXECUTION_PDF = "code_for traing.pdf"
 
-
-if not os.path.exists(DECISION_PDF) or not os.path.exists(IMPLEMENTATION_PDF):
-    st.error("❌ Reference PDFs not found in /data folder.")
+if not os.path.exists(DOMAIN_PDF) or not os.path.exists(EXECUTION_PDF):
+    st.error("❌ Reference PDFs not found.")
     st.stop()
 
 # ------------------------------
@@ -72,14 +73,14 @@ def load_pdf(path, doc_type):
 # ------------------------------
 @st.cache_resource(show_spinner=False)
 def build_vectorstore():
-    decision_docs = load_pdf(DECISION_PDF, "index_registry")
-    impl_docs = load_pdf(IMPLEMENTATION_PDF, "implementation_reference")
+    domain_docs = load_pdf(DOMAIN_PDF, "domain_knowledge")
+    execution_docs = load_pdf(EXECUTION_PDF, "execution_reference")
 
-    documents = decision_docs + impl_docs
+    documents = domain_docs + execution_docs
 
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=300,
-        chunk_overlap=0
+        chunk_size=250,
+        chunk_overlap=30
     )
     chunked_docs = splitter.split_documents(documents)
 
@@ -96,26 +97,34 @@ def build_vectorstore():
     return vectorstore
 
 # ------------------------------
-# RAG Prompt (from notebook)
+# RAG Prompt
 # ------------------------------
 RAG_PROMPT = """
-You are a remote sensing expert.
+You are a remote sensing and environmental analysis expert.
 
-Task:
-- Identify the environmental condition
-- Recommend ONE suitable index
-- Provide its formula
-- Recommend the best satellite
-- Provide a computation template
+Your task:
+1. Identify the environmental condition
+2. Recommend ONE suitable satellite index
+3. Provide its mathematical formula
+4. Recommend the most appropriate satellite sensor
+5. Provide a computation template
 
 Rules:
-- Use ONLY the given context
-- Do NOT invent indices or formulas
+- Use ONLY the provided context
+- Do NOT invent indices, equations, or satellites
 - Do NOT mix multiple indices
-- Output must be VALID JSON
+- Output MUST be valid JSON
+- Be scientifically precise
 
-Context:
-{context}
+====================
+DOMAIN KNOWLEDGE
+====================
+{domain_context}
+
+====================
+EXECUTION REFERENCE
+====================
+{execution_context}
 
 Question:
 {question}
@@ -131,16 +140,20 @@ with st.spinner("🔄 Loading environmental knowledge base..."):
 
 st.success("✅ Knowledge base loaded")
 
+# ------------------------------
 # Metadata-filtered retrievers
-decision_retriever = vectorstore.as_retriever(
-    search_kwargs={"k": 4, "filter": {"doc_type": "index_registry"}}
+# ------------------------------
+domain_retriever = vectorstore.as_retriever(
+    search_kwargs={"k": 4, "filter": {"doc_type": "domain_knowledge"}}
 )
 
-impl_retriever = vectorstore.as_retriever(
-    search_kwargs={"k": 4, "filter": {"doc_type": "implementation_reference"}}
+execution_retriever = vectorstore.as_retriever(
+    search_kwargs={"k": 4, "filter": {"doc_type": "execution_reference"}}
 )
 
+# ------------------------------
 # LLM
+# ------------------------------
 llm = ChatOpenAI(
     model="gpt-3.5-turbo",
     temperature=0,
@@ -153,20 +166,25 @@ llm = ChatOpenAI(
 st.subheader("🔎 Ask an environmental question")
 
 query = st.text_input(
-    "Example: How to assess vegetation stress using satellite data?"
+    "Example: How can flood risk be assessed using satellite data?"
 )
 
 if query:
     with st.spinner("🧠 Running RAG pipeline..."):
-        decision_docs = decision_retriever.invoke(query)
-        impl_docs = impl_retriever.invoke(query)
+        domain_docs = domain_retriever.invoke(query)
+        execution_docs = execution_retriever.invoke(query)
 
-        context = "\n\n".join(
-            [doc.page_content for doc in decision_docs + impl_docs]
+        domain_context = "\n\n".join(
+            doc.page_content for doc in domain_docs
+        )
+
+        execution_context = "\n\n".join(
+            doc.page_content for doc in execution_docs
         )
 
         prompt = RAG_PROMPT.format(
-            context=context,
+            domain_context=domain_context,
+            execution_context=execution_context,
             question=query
         )
 
@@ -174,7 +192,7 @@ if query:
 
         try:
             output = json.loads(response.content)
-            st.success("✅ Structured Answer")
+            st.success("✅ Structured Scientific Answer")
             st.json(output)
         except json.JSONDecodeError:
             st.error("⚠️ Model returned invalid JSON")
