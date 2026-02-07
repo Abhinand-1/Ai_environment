@@ -97,7 +97,7 @@ def build_vectorstore():
     return vectorstore
 
 # ------------------------------
-# RAG Prompt
+# ✅ FIX 1: RAG PROMPT (ASSIGNED PROPERLY)
 # ------------------------------
 RAG_PROMPT = """
 You are a remote sensing and environmental analysis expert.
@@ -109,12 +109,15 @@ Your task:
 4. Recommend the most appropriate satellite sensor
 5. Provide a computation template
 
-Rules:
+STRICT SCIENTIFIC RULES:
 - Use ONLY the provided context
 - Do NOT invent indices, equations, or satellites
 - Do NOT mix multiple indices
-- Output MUST be valid JSON
-- Be scientifically precise
+- Flood, inundation, surface water, or waterlogging problems MUST use water-related indices
+- Built-up or urban indices (e.g., NDBI, UI) are NOT valid for flood or water assessment
+- Vegetation indices are NOT valid for flood assessment
+- Output MUST be valid JSON only
+- Be scientifically correct and conservative
 
 ====================
 DOMAIN KNOWLEDGE
@@ -171,7 +174,13 @@ query = st.text_input(
 
 if query:
     with st.spinner("🧠 Running RAG pipeline..."):
-        domain_docs = domain_retriever.invoke(query)
+
+        # ------------------------------
+        # ✅ FIX 2: SOFT DOMAIN HINT (NOT RULE-BASED)
+        # ------------------------------
+        domain_query = query + " water flood surface water index"
+
+        domain_docs = domain_retriever.invoke(domain_query)
         execution_docs = execution_retriever.invoke(query)
 
         domain_context = "\n\n".join(
