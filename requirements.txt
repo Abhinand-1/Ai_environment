@@ -1,7 +1,7 @@
 streamlit==1.54.0
 
 # ----------------------
-# LangChain (COMPATIBLE)
+# LangChain (stable)
 # ----------------------
 langchain==0.2.16
 langchain-community==0.2.16
@@ -10,7 +10,7 @@ langchain-openai==0.1.7
 langchain-huggingface==0.0.3
 
 # ----------------------
-# Vector Database
+# Vector DB (safe)
 # ----------------------
 chromadb==0.4.24
 
@@ -26,14 +26,13 @@ openai==2.17.0
 tiktoken
 
 # ----------------------
-# PDF Parsing
+# PDF
 # ----------------------
 pypdf
 
 # ----------------------
-# Intent Model (SAFE for Streamlit)
+# Intent model (LET PIP DECIDE TORCH)
 # ----------------------
 transformers==4.39.3
-torch==2.1.2
 sentencepiece
 accelerate
