@@ -1,26 +1,39 @@
 streamlit==1.54.0
 
-# LangChain (stable)
+# ----------------------
+# LangChain (COMPATIBLE)
+# ----------------------
 langchain==0.2.16
 langchain-community==0.2.16
+langchain-core==0.2.40
 langchain-openai==0.1.7
 langchain-huggingface==0.0.3
 
-# Vector DB
-chromadb==0.5.5
+# ----------------------
+# Vector Database
+# ----------------------
+chromadb==0.4.24
 
+# ----------------------
 # Embeddings
+# ----------------------
 sentence-transformers==5.2.2
 
+# ----------------------
 # OpenAI
+# ----------------------
 openai==2.17.0
 tiktoken
 
-# PDF
+# ----------------------
+# PDF Parsing
+# ----------------------
 pypdf
 
-# 🔹 Intent model (SAFE versions)
+# ----------------------
+# Intent Model (SAFE for Streamlit)
+# ----------------------
 transformers==4.39.3
-torch==2.2.2
+torch==2.1.2
 sentencepiece
 accelerate
