@@ -2,7 +2,7 @@ streamlit
 langchain
 langchain-community
 langchain-openai
-chromadb
-tiktoken
 openai
+chromadb
 pypdf
+tiktoken
