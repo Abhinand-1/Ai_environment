@@ -66,7 +66,7 @@ query = st.text_input("💬 Ask a question based on the documents:")
 
 if query:
     with st.spinner("Searching documents..."):
-        docs = retriever.get_relevant_documents(query)
+        docs = retriever.invoke(query)
 
         context = "\n\n".join([doc.page_content for doc in docs])
 
@@ -87,6 +87,7 @@ Question:
 
     st.success("Answer:")
     st.write(response.content)
+
 
     # ---------------- SHOW SOURCES ----------------
     with st.expander("📚 View source document chunks"):
