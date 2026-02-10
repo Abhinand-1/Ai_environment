@@ -1,3 +1,2 @@
-__pycache__/
-.env
 rag_db/
+__pycache__/
