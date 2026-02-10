@@ -8,70 +8,48 @@ from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain.chains import RetrievalQA
 
-# -----------------------------
-# Streamlit UI
-# -----------------------------
 st.set_page_config(page_title="Environmental RAG Assistant", layout="wide")
-st.title("🌍 Environmental Indices RAG Assistant")
-st.write("Ask questions based on the uploaded satellite & GIS reference documents.")
+st.title("🌍 RAG Chat with Your Satellite & Code Docs")
 
-# -----------------------------
-# OpenAI API Key
-# -----------------------------
+# ---- Load API key ----
 openai_api_key = st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
-
 if not openai_api_key:
-    st.error("❌ OpenAI API key not found. Add it in Streamlit Secrets.")
+    st.error("OpenAI API key missing!")
     st.stop()
 
-# -----------------------------
-# Load PDFs
-# -----------------------------
-DATA_PATH = "data"
-PERSIST_DIR = "rag_db"
-
+# ---- Load your PDFs ----
 pdf_files = [
-    "code_for traing.pdf",
-    "Satellite Spectral Indices Reference For Rag Models.pdf"
+    "data/code_for traing.pdf",
+    "data/Satellite Spectral Indices Reference For Rag Models.pdf"
 ]
 
 documents = []
+for path in pdf_files:
+    try:
+        loader = PyPDFLoader(path)
+        documents.extend(loader.load())
+    except Exception as e:
+        st.error(f"Error loading {path}: {e}")
 
-for pdf in pdf_files:
-    loader = PyPDFLoader(os.path.join(DATA_PATH, pdf))
-    documents.extend(loader.load())
+if not documents:
+    st.error("No documents loaded")
+    st.stop()
 
-# -----------------------------
-# Split Documents
-# -----------------------------
-text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=800,
-    chunk_overlap=100
-)
+# ---- Split into chunks ----
+splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=150)
+chunked_docs = splitter.split_documents(documents)
 
-chunked_docs = text_splitter.split_documents(documents)
-
-# -----------------------------
-# Embeddings
-# -----------------------------
-embeddings = OpenAIEmbeddings(
-    openai_api_key=openai_api_key
-)
-
-# -----------------------------
-# Chroma Vector Store (Persistent)
-# -----------------------------
+# ---- Build vector store ----
+embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
 vectorstore = Chroma.from_documents(
     documents=chunked_docs,
     embedding=embeddings,
-    persist_directory=PERSIST_DIR
+    persist_directory="rag_db"
 )
 
 retriever = vectorstore.as_retriever(search_kwargs={"k": 4})
 
-# -----------------------------
-# GPT-mini Model
-# -----------------------------
+# ---- Setup LLM (GPT-mini) ----
 llm = ChatOpenAI(
     model="gpt-4o-mini",
     temperature=0,
@@ -84,13 +62,11 @@ qa_chain = RetrievalQA.from_chain_type(
     chain_type="stuff"
 )
 
-# -----------------------------
-# User Query
-# -----------------------------
-query = st.text_input("💬 Ask your question:")
+# ---- UI query box ----
+query = st.text_input("💬 Ask a question about these docs:")
 
 if query:
-    with st.spinner("Searching documents..."):
-        response = qa_chain.run(query)
-    st.success("Answer:")
-    st.write(response)
+    with st.spinner("Searching..."):
+        answer = qa_chain.run(query)
+    st.write("**Answer:**")
+    st.write(answer)
