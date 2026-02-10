@@ -7,7 +7,6 @@ from langchain_community.vectorstores import Chroma
 
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain.chains import RetrievalQA
- RetrievalQA
 
 # -----------------------------
 # Streamlit UI
