@@ -7,7 +7,7 @@ from langchain_community.vectorstores import Chroma
 
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain.chains.retrieval_qa import RetrievalQA
- RetrievalQA
+
 
 
 st.set_page_config(page_title="Environmental RAG Assistant", layout="wide")
