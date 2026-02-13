@@ -2,14 +2,14 @@ import streamlit as st
 import ee
 import leafmap.foliumap as geemap
 import json
-import os
 
 from geopy.geocoders import Nominatim
 
+# ===== LangChain (MODULAR, CORRECT IMPORTS) =====
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.vectorstores import FAISS
-from langchain_core.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 
@@ -20,6 +20,7 @@ from langchain.chains import LLMChain
 st.set_page_config(page_title="AI Environmental Analysis", layout="wide")
 st.title("🌍 AI-Powered Environmental Analysis (RAG + GEE)")
 st.caption("Natural language → Satellite maps, charts & explanation")
+
 
 # =========================
 # EARTH ENGINE INIT
@@ -35,6 +36,7 @@ def initialize_gee():
         ee.Initialize()
 
 initialize_gee()
+
 
 # =========================
 # LOAD RAG DOCUMENTS
@@ -67,6 +69,7 @@ def load_vectorstore():
 
 vectorstore = load_vectorstore()
 
+
 # =========================
 # LLM + PROMPT
 # =========================
@@ -89,17 +92,17 @@ Using ONLY the context below, decide:
 
 Return STRICT JSON:
 
-{{
-  "index": "...",
+{
+  "index": "NDVI",
   "index_type": "normalized_difference",
   "bands": ["B8", "B4"],
   "sensor": "Sentinel-2",
-  "visualization": {{
+  "visualization": {
     "min": -0.2,
     "max": 0.8,
     "palette": ["blue", "white", "green"]
-  }}
-}}
+  }
+}
 
 Context:
 {context}
@@ -110,6 +113,7 @@ Query:
 )
 
 chain = LLMChain(llm=llm, prompt=science_prompt)
+
 
 # =========================
 # RAG DECISION FUNCTION
@@ -125,6 +129,7 @@ def get_plan_from_query(query):
 
     return json.loads(response)
 
+
 # =========================
 # LOCATION → GEOMETRY
 # =========================
@@ -138,6 +143,7 @@ def get_geometry_from_location(location_name):
 
     return ee.Geometry.Point([loc.longitude, loc.latitude]).buffer(20000)
 
+
 # =========================
 # GEE ANALYSIS ENGINE
 # =========================
@@ -146,7 +152,7 @@ def run_environmental_analysis(plan, geometry, year):
     bands = plan["bands"]
 
     collection = (
-        ee.ImageCollection("COPERNICUS/S2_SR")
+        ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
         .filterBounds(geometry)
         .filterDate(f"{year}-01-01", f"{year}-12-31")
         .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 20))
@@ -170,6 +176,7 @@ def run_environmental_analysis(plan, geometry, year):
     )
 
     return Map, chart
+
 
 # =========================
 # STREAMLIT UI
