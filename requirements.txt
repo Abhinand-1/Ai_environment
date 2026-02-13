@@ -1,17 +1,38 @@
+# --------------------
+# Core & Platform
+# --------------------
 setuptools
 streamlit
 earthengine-api
-leafmap
 
+# --------------------
+# Geospatial
+# --------------------
+leafmap
+geopy
+
+# --------------------
+# LangChain (MODULAR – REQUIRED)
+# --------------------
 langchain
 langchain-core
 langchain-community
 langchain-openai
 langchain-text-splitters
 
+# --------------------
+# Vector Store
+# --------------------
 faiss-cpu
+
+# --------------------
+# Documents & Tokens
+# --------------------
 pypdf
 tiktoken
-geopy
+
+# --------------------
+# Data & Plotting
+# --------------------
 pandas
 matplotlib
