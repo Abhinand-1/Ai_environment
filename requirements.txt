@@ -3,11 +3,8 @@ setuptools
 streamlit
 earthengine-api
 
-# --- Geospatial stack ---
-geemap==0.35.1
-folium==0.17.0
-xyzservices==2023.10.1
-python-box==7.1.1
+# --- Geospatial (SAFE on Python 3.13) ---
+leafmap
 
 # --- RAG / LLM ---
 langchain
@@ -21,4 +18,5 @@ tiktoken
 geopy
 pandas
 matplotlib
+
 
