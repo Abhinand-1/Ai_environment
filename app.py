@@ -22,17 +22,17 @@ st.caption("Natural language → Satellite maps, charts & explanation")
 
 
 # =================================================
-# EARTH ENGINE INITIALIZATION
+# EARTH ENGINE INITIALIZATION (SERVICE ACCOUNT ONLY)
 # =================================================
 def initialize_gee():
-    try:
-        credentials = ee.ServiceAccountCredentials(
-            st.secrets["GEE_SERVICE_ACCOUNT"],
-            key_data=json.loads(st.secrets["GEE_PRIVATE_KEY"])
-        )
-        ee.Initialize(credentials)
-    except Exception:
-        ee.Initialize()
+    credentials = ee.ServiceAccountCredentials(
+        st.secrets["GEE_SERVICE_ACCOUNT"],
+        key_data=json.loads(st.secrets["GEE_PRIVATE_KEY"])
+    )
+    ee.Initialize(credentials)
+
+    # --- Optional health check ---
+    ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED").limit(1).getInfo()
 
 initialize_gee()
 
@@ -63,14 +63,13 @@ def load_vectorstore():
         api_key=st.secrets["OPENAI_API_KEY"]
     )
 
-    vectorstore = FAISS.from_documents(chunks, embeddings)
-    return vectorstore
+    return FAISS.from_documents(chunks, embeddings)
 
 vectorstore = load_vectorstore()
 
 
 # =================================================
-# LLM + PROMPT (NO LLMChain)
+# LLM + PROMPT (MODERN, NO CHAINS)
 # =================================================
 llm = ChatOpenAI(
     model="gpt-4o-mini",
@@ -113,20 +112,20 @@ Query:
 
 
 # =================================================
-# RAG DECISION FUNCTION (MODERN LANGCHAIN)
+# RAG DECISION FUNCTION (SAFE JSON PARSING)
 # =================================================
 def get_plan_from_query(query):
     docs = vectorstore.similarity_search(query, k=4)
-    context = "\n\n".join([d.page_content for d in docs])
+    context = "\n\n".join(d.page_content for d in docs)
 
-    prompt = science_prompt.format(
-        context=context,
-        query=query
-    )
+    prompt = science_prompt.format(context=context, query=query)
+    response = llm.invoke(prompt).content.strip()
 
-    response = llm.invoke(prompt)
-
-    return json.loads(response.content)
+    try:
+        return json.loads(response)
+    except json.JSONDecodeError:
+        st.error("❌ LLM returned invalid JSON. Try rephrasing the query.")
+        st.stop()
 
 
 # =================================================
@@ -140,11 +139,13 @@ def get_geometry_from_location(location_name):
         st.error("❌ Location not found")
         st.stop()
 
+    st.info(f"📍 Location identified: **{loc.address}**")
+
     return ee.Geometry.Point([loc.longitude, loc.latitude]).buffer(20000)
 
 
 # =================================================
-# GEE ANALYSIS ENGINE (GENERIC ND INDEX)
+# GEE ANALYSIS ENGINE
 # =================================================
 def run_environmental_analysis(plan, geometry, year):
     index = plan["index"]
