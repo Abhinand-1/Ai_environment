@@ -3,14 +3,19 @@ setuptools
 streamlit
 earthengine-api
 
-# --- Geospatial (SAFE on Python 3.13) ---
+# --- Geospatial ---
 leafmap
 
-# --- RAG / LLM ---
+# --- LangChain (IMPORTANT) ---
 langchain
+langchain-core
 langchain-community
 langchain-openai
+
+# --- Vector DB ---
 faiss-cpu
+
+# --- Docs ---
 pypdf
 tiktoken
 
@@ -18,5 +23,3 @@ tiktoken
 geopy
 pandas
 matplotlib
-
-
