@@ -27,7 +27,7 @@ st.caption("Natural language → Satellite maps, charts & explanation")
 def initialize_gee():
     credentials = ee.ServiceAccountCredentials(
         st.secrets["GEE_SERVICE_ACCOUNT"],
-        key_data=json.loads(st.secrets["GEE_PRIVATE_KEY"])
+        key_data=st.secrets["GEE_PRIVATE_KEY"]   # ✅ FIXED (no json.loads)
     )
     ee.Initialize(credentials)
 
@@ -69,7 +69,7 @@ vectorstore = load_vectorstore()
 
 
 # =================================================
-# LLM + PROMPT (MODERN, NO CHAINS)
+# LLM + PROMPT (NO CHAINS, MODERN LANGCHAIN)
 # =================================================
 llm = ChatOpenAI(
     model="gpt-4o-mini",
@@ -124,7 +124,7 @@ def get_plan_from_query(query):
     try:
         return json.loads(response)
     except json.JSONDecodeError:
-        st.error("❌ LLM returned invalid JSON. Try rephrasing the query.")
+        st.error("❌ LLM returned invalid JSON. Please rephrase the query.")
         st.stop()
 
 
