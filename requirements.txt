@@ -6,16 +6,17 @@ earthengine-api
 # --- Geospatial ---
 leafmap
 
-# --- LangChain (IMPORTANT) ---
+# --- LangChain (CORRECT modular setup) ---
 langchain
 langchain-core
 langchain-community
 langchain-openai
+langchain-text-splitters
 
-# --- Vector DB ---
+# --- Vector store ---
 faiss-cpu
 
-# --- Docs ---
+# --- Docs & tokens ---
 pypdf
 tiktoken
 
