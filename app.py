@@ -5,28 +5,25 @@ import json
 
 from geopy.geocoders import Nominatim
 
-# ===== LangChain (MODULAR, CORRECT IMPORTS) =====
+# ===== LangChain (modern, stable imports) =====
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.vectorstores import FAISS
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.prompts import PromptTemplate
-from langchain.chains import LLMChain
 
 
-
-
-# =========================
+# =================================================
 # STREAMLIT CONFIG
-# =========================
+# =================================================
 st.set_page_config(page_title="AI Environmental Analysis", layout="wide")
 st.title("🌍 AI-Powered Environmental Analysis (RAG + GEE)")
 st.caption("Natural language → Satellite maps, charts & explanation")
 
 
-# =========================
-# EARTH ENGINE INIT
-# =========================
+# =================================================
+# EARTH ENGINE INITIALIZATION
+# =================================================
 def initialize_gee():
     try:
         credentials = ee.ServiceAccountCredentials(
@@ -40,9 +37,9 @@ def initialize_gee():
 initialize_gee()
 
 
-# =========================
-# LOAD RAG DOCUMENTS
-# =========================
+# =================================================
+# LOAD & INDEX RAG DOCUMENTS
+# =================================================
 @st.cache_resource
 def load_vectorstore():
     loaders = [
@@ -72,9 +69,9 @@ def load_vectorstore():
 vectorstore = load_vectorstore()
 
 
-# =========================
-# LLM + PROMPT
-# =========================
+# =================================================
+# LLM + PROMPT (NO LLMChain)
+# =================================================
 llm = ChatOpenAI(
     model="gpt-4o-mini",
     temperature=0,
@@ -92,7 +89,7 @@ Using ONLY the context below, decide:
 - sensor
 - visualization parameters
 
-Return STRICT JSON:
+Return STRICT JSON ONLY:
 
 {
   "index": "NDVI",
@@ -114,27 +111,27 @@ Query:
 """
 )
 
-chain = LLMChain(llm=llm, prompt=science_prompt)
 
-
-# =========================
-# RAG DECISION FUNCTION
-# =========================
+# =================================================
+# RAG DECISION FUNCTION (MODERN LANGCHAIN)
+# =================================================
 def get_plan_from_query(query):
     docs = vectorstore.similarity_search(query, k=4)
     context = "\n\n".join([d.page_content for d in docs])
 
-    response = chain.run({
-        "context": context,
-        "query": query
-    })
+    prompt = science_prompt.format(
+        context=context,
+        query=query
+    )
 
-    return json.loads(response)
+    response = llm.invoke(prompt)
+
+    return json.loads(response.content)
 
 
-# =========================
-# LOCATION → GEOMETRY
-# =========================
+# =================================================
+# LOCATION → EARTH ENGINE GEOMETRY
+# =================================================
 def get_geometry_from_location(location_name):
     geolocator = Nominatim(user_agent="rag-gee-app")
     loc = geolocator.geocode(location_name)
@@ -146,9 +143,9 @@ def get_geometry_from_location(location_name):
     return ee.Geometry.Point([loc.longitude, loc.latitude]).buffer(20000)
 
 
-# =========================
-# GEE ANALYSIS ENGINE
-# =========================
+# =================================================
+# GEE ANALYSIS ENGINE (GENERIC ND INDEX)
+# =================================================
 def run_environmental_analysis(plan, geometry, year):
     index = plan["index"]
     bands = plan["bands"]
@@ -180,15 +177,19 @@ def run_environmental_analysis(plan, geometry, year):
     return Map, chart
 
 
-# =========================
+# =================================================
 # STREAMLIT UI
-# =========================
+# =================================================
 query = st.text_input(
     "Enter your analysis request",
     "Analyze vegetation condition in Kochi for 2023"
 )
 
-year = st.selectbox("Select Year", ["2021", "2022", "2023", "2024"], index=2)
+year = st.selectbox(
+    "Select Year",
+    ["2021", "2022", "2023", "2024"],
+    index=2
+)
 
 if st.button("🚀 Run Analysis"):
     with st.spinner("Running RAG + Satellite analysis..."):
@@ -209,7 +210,7 @@ if st.button("🚀 Run Analysis"):
             st.subheader("📈 Time Series")
             st.pyplot(chart)
 
-        st.subheader("🧠 Selected Index & Reasoning")
+        st.subheader("🧠 Selected Index & Parameters")
         st.json(plan)
 
         st.success("✅ Analysis completed successfully")
