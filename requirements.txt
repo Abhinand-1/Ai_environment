@@ -1,26 +1,17 @@
 setuptools
-
 streamlit
 earthengine-api
-
-# --- Geospatial ---
 leafmap
 
-# --- LangChain (CORRECT modular setup) ---
 langchain
 langchain-core
 langchain-community
 langchain-openai
 langchain-text-splitters
 
-# --- Vector store ---
 faiss-cpu
-
-# --- Docs & tokens ---
 pypdf
 tiktoken
-
-# --- Utilities ---
 geopy
 pandas
 matplotlib
