@@ -1,17 +1,22 @@
 streamlit
 earthengine-api
+
+# --- Geospatial stack (compatible set) ---
 geemap==0.35.1
-folium==0.15.1
+folium==0.17.0
 xyzservices==2023.10.1
 python-box==7.1.1
 
+# --- RAG / LLM ---
 langchain
 langchain-community
 langchain-openai
 faiss-cpu
 pypdf
+tiktoken
+
+# --- Utilities ---
 geopy
 pandas
 matplotlib
-tiktoken
 
