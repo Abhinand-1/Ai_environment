@@ -1,7 +1,9 @@
+setuptools
+
 streamlit
 earthengine-api
 
-# --- Geospatial stack (compatible set) ---
+# --- Geospatial stack ---
 geemap==0.35.1
 folium==0.17.0
 xyzservices==2023.10.1
