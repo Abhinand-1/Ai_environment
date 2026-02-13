@@ -1,6 +1,10 @@
 streamlit
 earthengine-api
-geemap
+geemap==0.35.1
+folium==0.15.1
+xyzservices==2023.10.1
+python-box==7.1.1
+
 langchain
 langchain-community
 langchain-openai
@@ -10,5 +14,4 @@ geopy
 pandas
 matplotlib
 tiktoken
-
 
