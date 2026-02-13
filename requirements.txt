@@ -1,11 +1,14 @@
 streamlit
-openai
+earthengine-api
+geemap
 langchain
 langchain-community
 langchain-openai
-langchain-text-splitters
-chromadb
+faiss-cpu
 pypdf
+geopy
+pandas
+matplotlib
 tiktoken
 
 
