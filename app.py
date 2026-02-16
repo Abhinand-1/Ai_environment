@@ -5,7 +5,7 @@ import json
 
 from geopy.geocoders import Nominatim
 
-# ===== LangChain (modern, stable imports) =====
+# ===== LangChain (modern imports) =====
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.vectorstores import FAISS
@@ -22,16 +22,17 @@ st.caption("Natural language → Satellite maps, charts & explanation")
 
 
 # =================================================
-# EARTH ENGINE INITIALIZATION (SERVICE ACCOUNT ONLY)
+# EARTH ENGINE INITIALIZATION (SERVICE ACCOUNT)
 # =================================================
+@st.cache_resource
 def initialize_gee():
     credentials = ee.ServiceAccountCredentials(
         st.secrets["GEE_SERVICE_ACCOUNT"],
-        key_data=st.secrets["GEE_PRIVATE_KEY"]   # ✅ FIXED (no json.loads)
+        key_data=st.secrets["GEE_PRIVATE_KEY"]  # string JSON (correct)
     )
     ee.Initialize(credentials)
 
-    # --- Optional health check ---
+    # health check
     ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED").limit(1).getInfo()
 
 initialize_gee()
@@ -44,7 +45,7 @@ initialize_gee()
 def load_vectorstore():
     loaders = [
         PyPDFLoader("data/Satellite_Indices_RAG.pdf"),
-        PyPDFLoader("data/GEE_Code_Reference.pdf")
+        PyPDFLoader("data/GEE_Code_Reference.pdf"),
     ]
 
     documents = []
@@ -69,7 +70,7 @@ vectorstore = load_vectorstore()
 
 
 # =================================================
-# LLM + PROMPT (NO CHAINS, MODERN LANGCHAIN)
+# LLM + PROMPT
 # =================================================
 llm = ChatOpenAI(
     model="gpt-4o-mini",
@@ -88,7 +89,7 @@ Using ONLY the context below, decide:
 - sensor
 - visualization parameters
 
-Return STRICT JSON ONLY:
+Return STRICT JSON ONLY (no explanation text):
 
 {{
   "index": "NDVI",
@@ -112,31 +113,41 @@ Query:
 
 
 # =================================================
-# RAG DECISION FUNCTION (SAFE JSON PARSING)
+# RAG DECISION FUNCTION (ROBUST)
 # =================================================
-def get_plan_from_query(query):
+def get_plan_from_query(query, retries=2):
     docs = vectorstore.similarity_search(query, k=4)
     context = "\n\n".join(d.page_content for d in docs)
 
     prompt = science_prompt.format(context=context, query=query)
-    response = llm.invoke(prompt).content.strip()
 
-    try:
-        return json.loads(response)
-    except json.JSONDecodeError:
-        st.error("❌ LLM returned invalid JSON. Please rephrase the query.")
-        st.stop()
+    for attempt in range(retries + 1):
+        response = llm.invoke(prompt).content.strip()
+
+        # try to extract JSON safely
+        try:
+            start = response.index("{")
+            end = response.rindex("}") + 1
+            return json.loads(response[start:end])
+        except Exception:
+            if attempt == retries:
+                st.error("❌ AI failed to return valid JSON. Please rephrase your query.")
+                st.stop()
 
 
 # =================================================
-# LOCATION → EARTH ENGINE GEOMETRY
+# LOCATION → GEOMETRY (ROBUST)
 # =================================================
 def get_geometry_from_location(location_name):
+    # simple normalization for common mistakes
+    location_name = location_name.lower()
+    location_name = location_name.replace("wayand", "wayanad")
+
     geolocator = Nominatim(user_agent="rag-gee-app")
-    loc = geolocator.geocode(location_name)
+    loc = geolocator.geocode(location_name, timeout=10)
 
     if loc is None:
-        st.error("❌ Location not found")
+        st.error("❌ Location not found. Please be more specific.")
         st.stop()
 
     st.info(f"📍 Location identified: **{loc.address}**")
@@ -183,7 +194,7 @@ def run_environmental_analysis(plan, geometry, year):
 # =================================================
 query = st.text_input(
     "Enter your analysis request",
-    "Analyze vegetation condition in Kochi for 2023"
+    "Analyze vegetation condition in Wayanad district, Kerala, India for 2023"
 )
 
 year = st.selectbox(
