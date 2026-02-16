@@ -90,17 +90,17 @@ Using ONLY the context below, decide:
 
 Return STRICT JSON ONLY:
 
-{
+{{
   "index": "NDVI",
   "index_type": "normalized_difference",
   "bands": ["B8", "B4"],
   "sensor": "Sentinel-2",
-  "visualization": {
+  "visualization": {{
     "min": -0.2,
     "max": 0.8,
     "palette": ["blue", "white", "green"]
-  }
-}
+  }}
+}}
 
 Context:
 {context}
