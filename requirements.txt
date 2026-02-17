@@ -1,38 +1,41 @@
 # --------------------
 # Core & Platform
 # --------------------
-setuptools
-streamlit
-earthengine-api
+setuptools>=65.5.0
+streamlit==1.32.2
+earthengine-api==0.1.395
 
 # --------------------
-# Geospatial
+# Geospatial (LOCKED)
 # --------------------
-geemap
-geopy
+geemap==0.30.4
+folium==0.14.0
+xyzservices==2023.5.0
+python-box==6.0.2
+geopy==2.4.1
 
 # --------------------
-# LangChain (MODULAR – REQUIRED)
+# LangChain (Stable)
 # --------------------
-langchain
-langchain-core
-langchain-community
-langchain-openai
-langchain-text-splitters
+langchain==0.1.16
+langchain-core==0.1.45
+langchain-community==0.0.32
+langchain-openai==0.0.8
+langchain-text-splitters==0.0.1
 
 # --------------------
 # Vector Store
 # --------------------
-faiss-cpu
+faiss-cpu==1.7.4
 
 # --------------------
 # Documents & Tokens
 # --------------------
-pypdf
-tiktoken
+pypdf==4.2.0
+tiktoken==0.6.0
 
 # --------------------
 # Data & Plotting
 # --------------------
-pandas
-matplotlib
+pandas==2.2.2
+matplotlib==3.8.4
