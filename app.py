@@ -1,13 +1,13 @@
 import streamlit as st
 import ee
 import leafmap.foliumap as leafmap
-
 import json
 import re
+import matplotlib.pyplot as plt
 
 from geopy.geocoders import Nominatim
 
-# ===== LangChain (modern imports) =====
+# ===== LangChain =====
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.vectorstores import FAISS
@@ -41,7 +41,7 @@ def safe_json_parse(text: str):
 
 
 # =================================================
-# EARTH ENGINE INITIALIZATION
+# EARTH ENGINE INIT
 # =================================================
 @st.cache_resource
 def initialize_gee():
@@ -99,23 +99,17 @@ science_prompt = PromptTemplate(
     template="""
 You are an environmental remote sensing expert.
 
-Using ONLY the context below, decide:
-- appropriate spectral index
-- bands
-- sensor
-- visualization parameters
-
 Return STRICT JSON ONLY:
 
-{{
+{
   "index": "NDVI",
   "bands": ["B8", "B4"],
-  "visualization": {{
+  "visualization": {
     "min": -0.2,
     "max": 0.8,
     "palette": ["blue", "white", "green"]
-  }}
-}}
+  }
+}
 
 Context:
 {context}
@@ -139,7 +133,7 @@ def get_plan_from_query(query):
     try:
         return safe_json_parse(response)
     except:
-        st.error("❌ AI returned invalid JSON. Please rephrase your query.")
+        st.error("❌ AI returned invalid JSON.")
         st.stop()
 
 
@@ -147,8 +141,6 @@ def get_plan_from_query(query):
 # LOCATION → GEOMETRY
 # =================================================
 def get_geometry_from_location(location_name):
-    location_name = location_name.lower().replace("wayand", "wayanad")
-
     geolocator = Nominatim(user_agent="rag-gee-app")
     loc = geolocator.geocode(location_name, timeout=10)
 
@@ -162,7 +154,7 @@ def get_geometry_from_location(location_name):
 
 
 # =================================================
-# GEE ANALYSIS
+# GEE ANALYSIS (Leafmap Version)
 # =================================================
 def run_environmental_analysis(plan, geometry, year):
     index = plan["index"]
@@ -181,18 +173,25 @@ def run_environmental_analysis(plan, geometry, year):
     indexed = collection.map(compute_index)
     mean_img = indexed.mean().clip(geometry)
 
-    Map = geemap.Map()
-    Map.centerObject(geometry, 9)  # ✅ CORRECT
-    Map.addLayer(mean_img, plan["visualization"], f"{index} {year}")
+    # ---- Map ----
+    Map = leafmap.Map()
+    Map.add_ee_layer(mean_img, plan["visualization"], f"{index} {year}")
+    Map.centerObject(geometry, 9)
 
-    chart = geemap.chart.image.series(
-        indexed,
-        geometry,
-        ee.Reducer.mean(),
-        scale=10
-    )
+    # ---- Time Series Chart (Manual) ----
+    stats = indexed.select(index).reduceRegion(
+        reducer=ee.Reducer.mean(),
+        geometry=geometry,
+        scale=10,
+        maxPixels=1e9
+    ).getInfo()
 
-    return Map, chart
+    fig, ax = plt.subplots()
+    ax.bar([index], [stats[index]])
+    ax.set_ylabel("Mean Value")
+    ax.set_title(f"{index} Mean ({year})")
+
+    return Map, fig
 
 
 # =================================================
@@ -217,19 +216,19 @@ if st.button("🚀 Run Analysis"):
         geometry = get_geometry_from_location(location)
         plan = get_plan_from_query(query)
 
-        m, chart = run_environmental_analysis(plan, geometry, year)
+        m, fig = run_environmental_analysis(plan, geometry, year)
 
         col1, col2 = st.columns(2)
 
         with col1:
             st.subheader("🗺️ Spatial Map")
-            geemap.static_map(m)
+            m.to_streamlit(height=500)
 
         with col2:
-            st.subheader("📈 Time Series")
-            st.pyplot(chart)
+            st.subheader("📈 Index Summary")
+            st.pyplot(fig)
 
-        st.subheader("🧠 Selected Index & Parameters")
+        st.subheader("🧠 Selected Parameters")
         st.json(plan)
 
         st.success("✅ Analysis completed successfully")
