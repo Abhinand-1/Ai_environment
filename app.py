@@ -1,7 +1,8 @@
 import streamlit as st
 import ee
-import leafmap.foliumap as geemap
+import geemap.foliumap as geemap
 import json
+import re
 
 from geopy.geocoders import Nominatim
 
@@ -22,24 +23,38 @@ st.caption("Natural language → Satellite maps, charts & explanation")
 
 
 # =================================================
-# EARTH ENGINE INITIALIZATION (SERVICE ACCOUNT)
+# SAFE JSON PARSER
+# =================================================
+def safe_json_parse(text: str):
+    if not text or not text.strip():
+        raise ValueError("Empty LLM response")
+
+    try:
+        return json.loads(text)
+    except:
+        match = re.search(r"\{[\s\S]*\}", text)
+        if match:
+            return json.loads(match.group())
+
+    raise ValueError("Invalid JSON returned from LLM")
+
+
+# =================================================
+# EARTH ENGINE INITIALIZATION
 # =================================================
 @st.cache_resource
 def initialize_gee():
     credentials = ee.ServiceAccountCredentials(
         st.secrets["GEE_SERVICE_ACCOUNT"],
-        key_data=st.secrets["GEE_PRIVATE_KEY"]  # string JSON (correct)
+        key_data=st.secrets["GEE_PRIVATE_KEY"]
     )
     ee.Initialize(credentials)
-
-    # health check
-    ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED").limit(1).getInfo()
 
 initialize_gee()
 
 
 # =================================================
-# LOAD & INDEX RAG DOCUMENTS
+# LOAD RAG DOCUMENTS
 # =================================================
 @st.cache_resource
 def load_vectorstore():
@@ -70,7 +85,7 @@ vectorstore = load_vectorstore()
 
 
 # =================================================
-# LLM + PROMPT
+# LLM
 # =================================================
 llm = ChatOpenAI(
     model="gpt-4o-mini",
@@ -89,13 +104,11 @@ Using ONLY the context below, decide:
 - sensor
 - visualization parameters
 
-Return STRICT JSON ONLY (no explanation text):
+Return STRICT JSON ONLY:
 
 {{
   "index": "NDVI",
-  "index_type": "normalized_difference",
   "bands": ["B8", "B4"],
-  "sensor": "Sentinel-2",
   "visualization": {{
     "min": -0.2,
     "max": 0.8,
@@ -113,41 +126,33 @@ Query:
 
 
 # =================================================
-# RAG DECISION FUNCTION (ROBUST)
+# RAG DECISION
 # =================================================
-def get_plan_from_query(query, retries=2):
+def get_plan_from_query(query):
     docs = vectorstore.similarity_search(query, k=4)
     context = "\n\n".join(d.page_content for d in docs)
 
     prompt = science_prompt.format(context=context, query=query)
+    response = llm.invoke(prompt).content.strip()
 
-    for attempt in range(retries + 1):
-        response = llm.invoke(prompt).content.strip()
-
-        # try to extract JSON safely
-        try:
-            start = response.index("{")
-            end = response.rindex("}") + 1
-            return json.loads(response[start:end])
-        except Exception:
-            if attempt == retries:
-                st.error("❌ AI failed to return valid JSON. Please rephrase your query.")
-                st.stop()
+    try:
+        return safe_json_parse(response)
+    except:
+        st.error("❌ AI returned invalid JSON. Please rephrase your query.")
+        st.stop()
 
 
 # =================================================
-# LOCATION → GEOMETRY (ROBUST)
+# LOCATION → GEOMETRY
 # =================================================
 def get_geometry_from_location(location_name):
-    # simple normalization for common mistakes
-    location_name = location_name.lower()
-    location_name = location_name.replace("wayand", "wayanad")
+    location_name = location_name.lower().replace("wayand", "wayanad")
 
     geolocator = Nominatim(user_agent="rag-gee-app")
     loc = geolocator.geocode(location_name, timeout=10)
 
     if loc is None:
-        st.error("❌ Location not found. Please be more specific.")
+        st.error("❌ Location not found.")
         st.stop()
 
     st.info(f"📍 Location identified: **{loc.address}**")
@@ -156,7 +161,7 @@ def get_geometry_from_location(location_name):
 
 
 # =================================================
-# GEE ANALYSIS ENGINE
+# GEE ANALYSIS
 # =================================================
 def run_environmental_analysis(plan, geometry, year):
     index = plan["index"]
@@ -176,7 +181,7 @@ def run_environmental_analysis(plan, geometry, year):
     mean_img = indexed.mean().clip(geometry)
 
     Map = geemap.Map()
-    Map.center_object(geometry, zoom=9)   # ✅ FIXED
+    Map.centerObject(geometry, 9)  # ✅ CORRECT
     Map.addLayer(mean_img, plan["visualization"], f"{index} {year}")
 
     chart = geemap.chart.image.series(
@@ -187,7 +192,6 @@ def run_environmental_analysis(plan, geometry, year):
     )
 
     return Map, chart
-
 
 
 # =================================================
@@ -206,6 +210,7 @@ year = st.selectbox(
 
 if st.button("🚀 Run Analysis"):
     with st.spinner("Running RAG + Satellite analysis..."):
+
         location = query.split("in")[-1].split("for")[0].strip()
 
         geometry = get_geometry_from_location(location)
