@@ -1,6 +1,7 @@
 import streamlit as st
 import ee
-import geemap.foliumap as geemap
+import leafmap.foliumap as leafmap
+
 import json
 import re
 
