@@ -176,7 +176,7 @@ def run_environmental_analysis(plan, geometry, year):
     mean_img = indexed.mean().clip(geometry)
 
     Map = geemap.Map()
-    Map.centerObject(geometry, 9)
+    Map.center_object(geometry, zoom=9)   # ✅ FIXED
     Map.addLayer(mean_img, plan["visualization"], f"{index} {year}")
 
     chart = geemap.chart.image.series(
@@ -187,6 +187,7 @@ def run_environmental_analysis(plan, geometry, year):
     )
 
     return Map, chart
+
 
 
 # =================================================
