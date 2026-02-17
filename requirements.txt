@@ -15,7 +15,7 @@ langchain-community==0.0.32
 langchain-openai==0.0.8
 langchain-text-splitters==0.0.1
 
-faiss-cpu==1.7.4
+faiss-cpu==1.13.2
 pypdf==4.2.0
 tiktoken==0.6.0
 
