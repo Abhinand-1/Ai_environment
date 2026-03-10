@@ -390,5 +390,6 @@ if st.button("Run Analysis"):
         Map = visualize(index_img, roi, plan["index"])
 
         st.write("Rendering map...")
-        Map.to_streamlit(height=600)
+
+        st.components.v1.html(Map.to_html(), height=600)
 
