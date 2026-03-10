@@ -25,10 +25,18 @@ st.write("Ask a natural language query to analyze satellite data.")
 # EARTH ENGINE INIT
 # -----------------------------
 import json
+import ee
+import streamlit as st
 
 service_account = st.secrets["GEE_SERVICE_ACCOUNT"]
+private_key = st.secrets["GEE_PRIVATE_KEY"]
 
-key_dict = json.loads(st.secrets["GEE_SERVICE_ACCOUNT_JSON"])
+key_dict = {
+    "type": "service_account",
+    "client_email": service_account,
+    "private_key": private_key,
+    "token_uri": "https://oauth2.googleapis.com/token"
+}
 
 credentials = ee.ServiceAccountCredentials(
     service_account,
