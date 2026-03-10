@@ -24,10 +24,15 @@ st.write("Ask a natural language query to analyze satellite data.")
 # -----------------------------
 # EARTH ENGINE INIT
 # -----------------------------
+import json
+
 service_account = st.secrets["GEE_SERVICE_ACCOUNT"]
+
+key_dict = json.loads(st.secrets["GEE_SERVICE_ACCOUNT_JSON"])
+
 credentials = ee.ServiceAccountCredentials(
     service_account,
-    "service_account.json"
+    key_data=json.dumps(key_dict)
 )
 
 ee.Initialize(credentials)
