@@ -1,4 +1,4 @@
-```python
+
 import streamlit as st
 import ee
 import geemap
@@ -378,4 +378,4 @@ if st.button("Run Analysis"):
         Map = visualize(index_img, roi, plan["index"])
 
         Map.to_streamlit(height=600)
-```
+
