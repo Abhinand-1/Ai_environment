@@ -371,6 +371,7 @@ if st.button("Run Analysis"):
     with st.spinner("Running AI geospatial analysis..."):
 
         metadata = extract_metadata(query)
+        st.write("Metadata:", metadata)
 
         location = metadata["location"]
         start = metadata["start_date"]
@@ -378,12 +379,16 @@ if st.button("Run Analysis"):
         analysis = metadata["analysis_type"]
 
         plan = generate_plan(analysis)
+        st.write("Plan:", plan)
 
         roi = get_roi(location)
+        st.write("ROI loaded")
 
         index_img = run_analysis(plan, roi, start, end)
+        st.write("Index image generated")
 
         Map = visualize(index_img, roi, plan["index"])
 
+        st.write("Rendering map...")
         Map.to_streamlit(height=600)
 
