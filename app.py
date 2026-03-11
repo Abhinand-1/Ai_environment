@@ -328,12 +328,14 @@ def get_roi(location):
         roi_fc.size().gt(0),
         roi_fc.geometry(),
         ee.Geometry.Point(
-            geemap.geocode(location)[0]
+            [
+                geemap.geocode(location)[0][0],
+                geemap.geocode(location)[0][1]
+            ]
         ).buffer(50000)
     )
 
     return ee.Geometry(roi)
-
 #------------------------
 
 """
