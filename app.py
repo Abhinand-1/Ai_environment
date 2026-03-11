@@ -257,7 +257,7 @@ Query:
         "Sentinel-5P": "COPERNICUS/S5P/OFFL/L3_NO2"
     }
 
-  satellite = plan.get("satellite", "").strip()
+satellite = plan.get("satellite", "").strip()
 
 # Normalize satellite name
 satellite_map = {
