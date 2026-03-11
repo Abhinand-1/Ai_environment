@@ -239,22 +239,26 @@ Query:
 
     result = response.choices[0].message.content.strip()
 
-    import re
+import re
 
-    json_text = re.search(r'\{.*\}', result, re.DOTALL).group()
+json_text = re.search(r'\{.*\}', result, re.DOTALL).group()
 
-    plan = json.loads(json_text)
+plan = json.loads(json_text)
 
-    DATASETS = {
-        "Sentinel-2": "COPERNICUS/S2_SR_HARMONIZED",
-        "MODIS": "MODIS/061/MOD11A2",
-        "Sentinel-5P": "COPERNICUS/S5P/OFFL/L3_NO2"
-    }
+DATASETS = {
+    "Sentinel-2": "COPERNICUS/S2_SR_HARMONIZED",
+    "MODIS": "MODIS/061/MOD11A2",
+    "Sentinel-5P": "COPERNICUS/S5P/OFFL/L3_NO2"
+}
 
-    plan["collection"] = DATASETS.get(plan["satellite"])
+satellite = plan.get("satellite")
 
-    return plan
+if satellite not in DATASETS:
+    raise ValueError(f"Unsupported satellite returned by LLM: {satellite}")
 
+plan["collection"] = DATASETS[satellite]
+
+return plan
 # ---- cell ----
 
 """
@@ -416,7 +420,7 @@ if query:
     end = metadata["end_date"]
     analysis = metadata["analysis_type"]
 
-    plan = generate_plan(analysis)
+    plan = generate_plan(query)
 
     roi = get_roi(location)
 
