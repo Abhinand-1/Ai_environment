@@ -324,28 +324,15 @@ def get_roi(location):
         )
     )
 
-    # Check if boundary exists
-    if roi_fc.size().getInfo() > 0:
+    roi = ee.Algorithms.If(
+        roi_fc.size().gt(0),
+        roi_fc.geometry(),
+        ee.Geometry.Point(
+            geemap.geocode(location)[0]
+        ).buffer(50000)
+    )
 
-        roi = roi_fc.geometry()
-
-    else:
-
-        # Convert location name → coordinates
-        coords = geemap.geocode(location)
-
-        if coords:
-
-            lon, lat = coords[0][0], coords[0][1]
-
-            roi = ee.Geometry.Point([lon, lat]).buffer(50000)
-
-        else:
-
-            # final fallback
-            roi = ee.Geometry.Point([0,0]).buffer(50000)
-
-    return roi
+    return ee.Geometry(roi)
 
 #------------------------
 
