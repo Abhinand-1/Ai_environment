@@ -257,14 +257,41 @@ Query:
         "Sentinel-5P": "COPERNICUS/S5P/OFFL/L3_NO2"
     }
 
-    satellite = plan.get("satellite")
+  satellite = plan.get("satellite", "").strip()
 
-    if satellite not in DATASETS:
-        raise ValueError(f"Unsupported satellite returned by LLM: {satellite}")
+# Normalize satellite name
+satellite_map = {
+    "sentinel-2": "Sentinel-2",
+    "sentinel2": "Sentinel-2",
+    "sentinel 2": "Sentinel-2",
+    "modis": "MODIS",
+    "sentinel-5p": "Sentinel-5P",
+    "sentinel5p": "Sentinel-5P"
+}
 
-    plan["collection"] = DATASETS[satellite]
+satellite = satellite_map.get(satellite.lower(), satellite)
 
-    return plan
+# fallback if LLM gives wrong satellite
+if satellite not in DATASETS:
+
+    index_name = plan.get("index")
+
+    if index_name in ["NDVI", "NDWI", "NDMI", "NDBI"]:
+        satellite = "Sentinel-2"
+
+    elif index_name == "LST":
+        satellite = "MODIS"
+
+    elif index_name == "NO2":
+        satellite = "Sentinel-5P"
+
+    else:
+        satellite = "Sentinel-2"
+
+plan["satellite"] = satellite
+plan["collection"] = DATASETS[satellite]
+
+return plan
 # ---- cell ----
 
 """
