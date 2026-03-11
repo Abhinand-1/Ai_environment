@@ -365,12 +365,12 @@ def run_analysis(plan, region, start, end):
 
     else:
 
-    collection = (
-        ee.ImageCollection(plan["collection"])
-        .filterDate(start, end)
-        .filterBounds(region)
-        .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 20))
-        .median()
+        collection = (
+            ee.ImageCollection(plan["collection"])
+            .filterDate(start, end)
+            .filterBounds(region)
+            .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 20))
+            .median()
     )
 
     bands = plan["bands"]
