@@ -1,32 +1,16 @@
 
-import streamlit as st
+
+# ---- cell ----
+
 import ee
 import geemap
-import json
-import re
-import numpy as np
-import faiss
-
-from sentence_transformers import SentenceTransformer
-from openai import OpenAI
-
-# -----------------------------
-# PAGE CONFIG
-# -----------------------------
-st.set_page_config(
-    page_title="AI Geospatial Assistant",
-    layout="wide"
-)
-
-st.title("🌍 AI Geospatial Analysis Assistant")
-st.write("Ask a natural language query to analyze satellite data.")
-
-# -----------------------------
-# EARTH ENGINE INIT
-# -----------------------------
-import json
-import ee
 import streamlit as st
+from openai import OpenAI
+import json
+
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+
+
 
 service_account = st.secrets["GEE_SERVICE_ACCOUNT"]
 private_key = st.secrets["GEE_PRIVATE_KEY"]
@@ -43,16 +27,16 @@ credentials = ee.ServiceAccountCredentials(
     key_data=json.dumps(key_dict)
 )
 
-ee.Initialize(credentials)
+ee.Initialize(credentials, project="civic-nation-478705-d3")
 
-# -----------------------------
-# OPENAI CLIENT
-# -----------------------------
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+# ---- cell ----
 
-# -----------------------------
-# KNOWLEDGE BASE
-# -----------------------------
+"""
+Create Satellite Index Knowledge Dataset
+"""
+
+# ---- cell ----
+
 knowledge_base = [
 
 {
@@ -72,6 +56,9 @@ Sentinel-2
 Bands:
 NIR: B8
 SWIR: B11
+
+Keywords:
+drought, vegetation moisture, water stress
 """
 },
 
@@ -92,6 +79,9 @@ Sentinel-2
 Bands:
 NIR: B8
 Red: B4
+
+Keywords:
+vegetation health, greenness, biomass
 """
 },
 
@@ -101,7 +91,7 @@ Red: B4
 NDBI (Normalized Difference Built-up Index)
 
 Purpose:
-Detects built-up areas.
+Detects built-up and urban areas.
 
 Formula:
 (SWIR - NIR) / (SWIR + NIR)
@@ -112,6 +102,9 @@ Sentinel-2
 Bands:
 SWIR: B11
 NIR: B8
+
+Keywords:
+urban expansion, built-up area
 """
 },
 
@@ -132,14 +125,24 @@ Sentinel-2
 Bands:
 Green: B3
 NIR: B8
+
+Keywords:
+water mapping, lake detection
 """
 }
 
 ]
 
-# -----------------------------
-# VECTOR SEARCH (RAG)
-# -----------------------------
+# ---- cell ----
+
+"""
+Build Embeddings + FAISS Vector Store
+"""
+
+from sentence_transformers import SentenceTransformer
+import faiss
+import numpy as np
+
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
 documents = [doc["text"] for doc in knowledge_base]
@@ -152,6 +155,12 @@ index = faiss.IndexFlatL2(dimension)
 
 index.add(np.array(embeddings))
 
+# ---- cell ----
+
+"""
+RAG Retrieval Function
+"""
+
 def retrieve_context(query, k=2):
 
     query_vector = model.encode([query])
@@ -162,10 +171,36 @@ def retrieve_context(query, k=2):
 
     return results
 
+# ---- cell ----
 
-# -----------------------------
-# PLAN GENERATION
-# -----------------------------
+"""
+Query Intent Classifier
+"""
+
+def classify_intent(query):
+
+    query = query.lower()
+
+    if "drought" in query or "moisture" in query:
+        return "drought"
+
+    if "vegetation" in query or "crop" in query:
+        return "vegetation"
+
+    if "urban" in query or "built-up" in query:
+        return "urban"
+
+    if "water" in query or "lake" in query:
+        return "water"
+
+    return "unknown"
+
+# ---- cell ----
+
+"""
+Generate Analysis Plan
+"""
+
 def generate_plan(query):
 
     context = retrieve_context(query)
@@ -174,6 +209,12 @@ def generate_plan(query):
 You are a remote sensing expert.
 
 Choose the correct satellite index based on the query.
+
+Rules:
+Drought → NDMI
+Vegetation → NDVI
+Urban → NDBI
+Water → NDWI
 
 Return ONLY JSON:
 
@@ -198,6 +239,8 @@ Query:
 
     result = response.choices[0].message.content.strip()
 
+    import re
+
     json_text = re.search(r'\{.*\}', result, re.DOTALL).group()
 
     plan = json.loads(json_text)
@@ -212,21 +255,23 @@ Query:
 
     return plan
 
+# ---- cell ----
 
-# -----------------------------
-# METADATA EXTRACTION
-# -----------------------------
+"""
+Extract Location and Date
+"""
+
 def extract_metadata(query):
 
     prompt = f"""
-Extract metadata.
-
-Return JSON:
+Extract:
 
 location
 start_date
 end_date
 analysis_type
+
+Return JSON only.
 
 Query:
 {query}
@@ -240,17 +285,23 @@ Query:
 
     result = response.choices[0].message.content.strip()
 
+    import re
+
     json_text = re.search(r'\{.*\}', result, re.DOTALL).group()
 
     data = json.loads(json_text)
 
     return data
 
+# ---- cell ----
 
-# -----------------------------
-# REGION EXTRACTION
-# -----------------------------
+"""
+Get Boundary
+"""
+
 def get_roi(location):
+
+    location = location.title()
 
     districts = ee.FeatureCollection("FAO/GAUL/2015/level2")
 
@@ -270,10 +321,12 @@ def get_roi(location):
 
     return ee.Geometry(roi)
 
+# ---- cell ----
 
-# -----------------------------
-# ANALYSIS ENGINE
-# -----------------------------
+"""
+Run GEE Analysis
+"""
+
 def run_analysis(plan, region, start, end):
 
     index_name = plan["index"]
@@ -289,7 +342,7 @@ def run_analysis(plan, region, start, end):
 
         image = collection.mean()
 
-        lst = image.multiply(0.02).subtract(273.15).rename("LST")
+        lst = image.multiply(0.02).subtract(273.15)
 
         return lst.clip(region)
 
@@ -302,7 +355,7 @@ def run_analysis(plan, region, start, end):
             .select("tropospheric_NO2_column_number_density")
         )
 
-        image = collection.mean().rename("NO2")
+        image = collection.mean()
 
         return image.clip(region)
 
@@ -317,39 +370,23 @@ def run_analysis(plan, region, start, end):
 
         bands = plan["bands"]
 
-        index_img = collection.normalizedDifference(bands).rename(index_name)
+        index_img = collection.normalizedDifference(bands)
 
         return index_img.clip(region)
 
+# ---- cell ----
 
-# -----------------------------
-# VISUALIZATION
-# -----------------------------
+"""
+Visualization
+"""
+
 def visualize(index_img, region, index_name):
 
     Map = geemap.Map()
-    Map.centerObject(region, 7)
 
-    palettes = {
-        "NDVI": ["brown","yellow","green"],
-        "NDMI": ["8c510a","d8b365","f6e8c3","c7eae5","5ab4ac","01665e"],
-        "NDWI": ["white","cyan","blue"],
-        "NDBI": ["black","gray","red"],
-        "LST": ["blue","cyan","yellow","orange","red"],
-        "NO2": ["blue","cyan","yellow","orange","red"]
-    }
+    Map.centerObject(region, 8)
 
-    palette = palettes.get(index_name)
-
-    vis = {"min": -1, "max": 1, "palette": palette}
-
-    if index_name == "LST":
-        vis = {"min": 20, "max": 45, "palette": palette}
-
-    if index_name == "NO2":
-        vis = {"min": 0, "max": 0.0002, "palette": palette}
-
-    Map.addLayer(index_img.clip(region), vis, index_name)
+    Map.addLayer(index_img, {"min": -1, "max": 1}, index_name)
 
     Map.addLayer(region, {}, "ROI")
 
@@ -357,39 +394,34 @@ def visualize(index_img, region, index_name):
 
     return Map
 
+# ---- cell ----
 
-# -----------------------------
-# STREAMLIT UI
-# -----------------------------
+"""
+Run Pipeline
+"""
+
+st.title("GeoAI Environmental Analysis")
+
 query = st.text_input(
-    "Enter your analysis query",
-    "Monitor vegetation health in Karnataka during 2023"
+    "Enter your environmental analysis query",
+    "Assess air pollution in Kerala during 2022"
 )
 
-if st.button("Run Analysis"):
+if query:
 
-    with st.spinner("Running AI geospatial analysis..."):
+    metadata = extract_metadata(query)
 
-        metadata = extract_metadata(query)
-        st.write("Metadata:", metadata)
+    location = metadata["location"]
+    start = metadata["start_date"]
+    end = metadata["end_date"]
+    analysis = metadata["analysis_type"]
 
-        location = metadata["location"]
-        start = metadata["start_date"]
-        end = metadata["end_date"]
-        analysis = metadata["analysis_type"]
+    plan = generate_plan(analysis)
 
-        plan = generate_plan(analysis)
-        st.write("Plan:", plan)
+    roi = get_roi(location)
 
-        roi = get_roi(location)
-        st.write("ROI loaded")
+    index_img = run_analysis(plan, roi, start, end)
 
-        index_img = run_analysis(plan, roi, start, end)
-        st.write("Index image generated")
+    Map = visualize(index_img, roi, plan["index"])
 
-        Map = visualize(index_img, roi, plan["index"])
-
-        st.write("Rendering map...")
-
-        st.components.v1.html(Map.to_html(), height=600)
-
+    Map.to_streamlit(height=600)
