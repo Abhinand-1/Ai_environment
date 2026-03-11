@@ -233,32 +233,32 @@ Query:
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
-        messages=[{"role":"user","content":prompt}],
+        messages=[{"role": "user", "content": prompt}],
         temperature=0
     )
 
     result = response.choices[0].message.content.strip()
 
-import re
+    import re
 
-json_text = re.search(r'\{.*\}', result, re.DOTALL).group()
+    json_text = re.search(r'\{.*\}', result, re.DOTALL).group()
 
-plan = json.loads(json_text)
+    plan = json.loads(json_text)
 
-DATASETS = {
-    "Sentinel-2": "COPERNICUS/S2_SR_HARMONIZED",
-    "MODIS": "MODIS/061/MOD11A2",
-    "Sentinel-5P": "COPERNICUS/S5P/OFFL/L3_NO2"
-}
+    DATASETS = {
+        "Sentinel-2": "COPERNICUS/S2_SR_HARMONIZED",
+        "MODIS": "MODIS/061/MOD11A2",
+        "Sentinel-5P": "COPERNICUS/S5P/OFFL/L3_NO2"
+    }
 
-satellite = plan.get("satellite")
+    satellite = plan.get("satellite")
 
-if satellite not in DATASETS:
-    raise ValueError(f"Unsupported satellite returned by LLM: {satellite}")
+    if satellite not in DATASETS:
+        raise ValueError(f"Unsupported satellite returned by LLM: {satellite}")
 
-plan["collection"] = DATASETS[satellite]
+    plan["collection"] = DATASETS[satellite]
 
-return plan
+    return plan
 # ---- cell ----
 
 """
