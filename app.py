@@ -365,18 +365,25 @@ def run_analysis(plan, region, start, end):
 
     else:
 
-        collection = (
-            ee.ImageCollection(plan["collection"])
-            .filterDate(start, end)
-            .filterBounds(region)
-            .median()
-        )
+    collection = (
+        ee.ImageCollection(plan["collection"])
+        .filterDate(start, end)
+        .filterBounds(region)
+        .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 20))
+        .median()
+    )
 
-        bands = plan["bands"]
+    bands = plan["bands"]
 
-        index_img = collection.normalizedDifference(bands)
+    # Select required bands
+    image = collection.select(bands)
 
-        return index_img.clip(region)
+    # Compute spectral index
+    index_img = image.normalizedDifference(bands)
+
+    return index_img.clip(region)
+
+        
 
 # ---- cell ----
 
