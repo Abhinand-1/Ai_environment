@@ -406,18 +406,17 @@ def run_analysis(plan, region, start, end):
 
     else:
 
-        collection = (
-            ee.ImageCollection(plan["collection"])
-            .filterDate(start, end)
-            .filterBounds(region)
-            .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 60))
+    collection = (
+        ee.ImageCollection(plan["collection"])
+        .filterDate(start, end)
+        .filterBounds(region)
+        .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 60))
     )
 
-    count = collection.size()
-
+    # If no images after filtering, fallback to unfiltered collection
     image = ee.Image(
         ee.Algorithms.If(
-            count.gt(0),
+            collection.size().gt(0),
             collection.median(),
             ee.ImageCollection(plan["collection"])
             .filterDate(start, end)
@@ -431,7 +430,6 @@ def run_analysis(plan, region, start, end):
     index_img = image.normalizedDifference(bands)
 
     return index_img.clip(region)
-
 
         
 
