@@ -143,7 +143,13 @@ from sentence_transformers import SentenceTransformer
 import faiss
 import numpy as np
 
-model = SentenceTransformer('all-MiniLM-L6-v2')
+
+
+@st.cache_resource
+def load_embedding_model():
+    return SentenceTransformer("all-MiniLM-L6-v2")
+
+model = load_embedding_model()
 
 documents = [doc["text"] for doc in knowledge_base]
 
@@ -342,9 +348,7 @@ def get_roi(location):
     return roi
 
 #------------------------
-st.write("ROI:", roi)
-st.write("Index:", plan["index"])
-st.write("Dataset:", plan["collection"])
+
 """
 Run GEE Analysis
 """
@@ -478,12 +482,12 @@ if query:
         st.error("Dataset not found in analysis plan.")
         st.stop()
 
-index_img = run_analysis(plan, roi, start, end)
+    index_img = run_analysis(plan, roi, start, end)
 
-if index_img is None:
-    st.error("Analysis failed. No image generated.")
-    st.stop()
+    if index_img is None:
+        st.error("Analysis failed. No image generated.")
+        st.stop()
 
-Map = visualize(index_img, roi, plan["index"])
+    Map = visualize(index_img, roi, plan["index"])
 
-Map.to_streamlit(height=600)
+    Map.to_streamlit(height=600)
