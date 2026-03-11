@@ -349,8 +349,6 @@ st.write("Dataset:", plan["collection"])
 Run GEE Analysis
 """
 # ---- cell ----
-
-
 def run_analysis(plan, region, start, end):
 
     index_name = plan["index"]
@@ -390,26 +388,27 @@ def run_analysis(plan, region, start, end):
             .filterDate(start, end)
             .filterBounds(region)
             .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 20))
-)
+        )
 
-# ensure images exist
-count = collection.size()
+        # ensure images exist
+        count = collection.size()
 
-image = ee.Image(
-    ee.Algorithms.If(
-        count.gt(0),
-        collection.median(),
-        ee.Image.constant(0)
-    )
-)
+        image = ee.Image(
+            ee.Algorithms.If(
+                count.gt(0),
+                collection.median(),
+                ee.Image.constant(0)
+            )
+        )
 
-bands = plan["bands"]
+        bands = plan["bands"]
 
-image = image.select(bands)
+        image = image.select(bands)
 
-index_img = image.normalizedDifference(bands)
+        index_img = image.normalizedDifference(bands)
 
-return index_img.clip(region)
+        return index_img.clip(region)
+
 
         
 
