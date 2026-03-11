@@ -379,31 +379,31 @@ def run_analysis(plan, region, start, end):
 
     else:
 
-        collection = (
+    collection = (
+        ee.ImageCollection(plan["collection"])
+        .filterDate(start, end)
+        .filterBounds(region)
+        .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 60))
+    )
+
+    count = collection.size()
+
+    image = ee.Image(
+        ee.Algorithms.If(
+            count.gt(0),
+            collection.median(),
             ee.ImageCollection(plan["collection"])
             .filterDate(start, end)
             .filterBounds(region)
-            .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 20))
+            .median()
         )
+    )
 
-        # ensure images exist
-        count = collection.size()
+    bands = plan["bands"]
 
-        image = ee.Image(
-            ee.Algorithms.If(
-                count.gt(0),
-                collection.median(),
-                ee.Image.constant(0)
-            )
-        )
+    index_img = image.normalizedDifference(bands)
 
-        bands = plan["bands"]
-
-        image = image.select(bands)
-
-        index_img = image.normalizedDifference(bands)
-
-        return index_img.clip(region)
+    return index_img.clip(region)
 
 
         
