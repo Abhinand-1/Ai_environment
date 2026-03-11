@@ -443,8 +443,8 @@ if query:
 
     
     if index_img is None:
-    st.error("Analysis failed. No image generated.")
-    st.stop()
+        st.error("Analysis failed. No image generated.")
+        st.stop()
 
     Map = visualize(index_img, roi, plan["index"])
 
