@@ -302,6 +302,7 @@ Query:
 """
 Get Boundary
 """
+import geemap
 
 def get_roi(location):
 
@@ -317,19 +318,38 @@ def get_roi(location):
         )
     )
 
-    roi = ee.Algorithms.If(
-        roi_fc.size().gt(0),
-        roi_fc.geometry(),
-        ee.Geometry.Point([76.4, 9.6]).buffer(30000)
-    )
+    # Check if boundary exists
+    if roi_fc.size().getInfo() > 0:
 
-    return ee.Geometry(roi)
+        roi = roi_fc.geometry()
 
-# ---- cell ----
+    else:
 
+        # Convert location name → coordinates
+        coords = geemap.geocode(location)
+
+        if coords:
+
+            lon, lat = coords[0][0], coords[0][1]
+
+            roi = ee.Geometry.Point([lon, lat]).buffer(50000)
+
+        else:
+
+            # final fallback
+            roi = ee.Geometry.Point([0,0]).buffer(50000)
+
+    return roi
+
+#------------------------
+st.write("ROI:", roi)
+st.write("Index:", plan["index"])
+st.write("Dataset:", plan["collection"])
 """
 Run GEE Analysis
 """
+# ---- cell ----
+
 
 def run_analysis(plan, region, start, end):
 
@@ -370,18 +390,26 @@ def run_analysis(plan, region, start, end):
             .filterDate(start, end)
             .filterBounds(region)
             .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 20))
-            .median()
+)
+
+# ensure images exist
+count = collection.size()
+
+image = ee.Image(
+    ee.Algorithms.If(
+        count.gt(0),
+        collection.median(),
+        ee.Image.constant(0)
     )
+)
 
-    bands = plan["bands"]
+bands = plan["bands"]
 
-    # Select required bands
-    image = collection.select(bands)
+image = image.select(bands)
 
-    # Compute spectral index
-    index_img = image.normalizedDifference(bands)
+index_img = image.normalizedDifference(bands)
 
-    return index_img.clip(region)
+return index_img.clip(region)
 
         
 
