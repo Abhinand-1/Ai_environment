@@ -464,22 +464,26 @@ if query:
     location = metadata["location"]
     start = metadata["start_date"]
     end = metadata["end_date"]
-    analysis = metadata["analysis_type"]
 
     plan = generate_plan(query)
-    
+
     st.write("Metadata:", metadata)
     st.write("Plan:", plan)
 
     roi = get_roi(location)
 
-    index_img = run_analysis(plan, roi, start, end)
+    st.write("ROI:", roi)
 
-    
-    if index_img is None:
-        st.error("Analysis failed. No image generated.")
+    if "collection" not in plan:
+        st.error("Dataset not found in analysis plan.")
         st.stop()
 
-    Map = visualize(index_img, roi, plan["index"])
+index_img = run_analysis(plan, roi, start, end)
 
-    Map.to_streamlit(height=600)
+if index_img is None:
+    st.error("Analysis failed. No image generated.")
+    st.stop()
+
+Map = visualize(index_img, roi, plan["index"])
+
+Map.to_streamlit(height=600)
