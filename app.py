@@ -390,7 +390,19 @@ def visualize(index_img, region, index_name):
 
     Map.centerObject(region, 8)
 
-    Map.addLayer(index_img, {"min": -1, "max": 1}, index_name)
+    if index_name in ["NDVI","NDWI","NDMI","NDBI"]:
+        vis = {"min": -1, "max": 1, "palette": ["blue","white","green"]}
+
+    elif index_name == "LST":
+        vis = {"min": 20, "max": 40, "palette": ["blue","yellow","red"]}
+
+    elif index_name == "NO2":
+        vis = {"min": 0, "max": 0.0002, "palette": ["black","purple","red"]}
+
+    else:
+        vis = {}
+
+    Map.addLayer(index_img, vis, index_name)
 
     Map.addLayer(region, {}, "ROI")
 
@@ -421,10 +433,18 @@ if query:
     analysis = metadata["analysis_type"]
 
     plan = generate_plan(query)
+    
+    st.write("Metadata:", metadata)
+    st.write("Plan:", plan)
 
     roi = get_roi(location)
 
     index_img = run_analysis(plan, roi, start, end)
+
+    
+    if index_img is None:
+    st.error("Analysis failed. No image generated.")
+    st.stop()
 
     Map = visualize(index_img, roi, plan["index"])
 
