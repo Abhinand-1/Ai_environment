@@ -324,15 +324,12 @@ def get_roi(location):
         )
     )
 
+    coords = geemap.geocode(location)
+
     roi = ee.Algorithms.If(
         roi_fc.size().gt(0),
         roi_fc.geometry(),
-        ee.Geometry.Point(
-            [
-                geemap.geocode(location)[0][0],
-                geemap.geocode(location)[0][1]
-            ]
-        ).buffer(50000)
+        ee.Geometry.Point([coords[0][0], coords[0][1]]).buffer(50000)
     )
 
     return ee.Geometry(roi)
